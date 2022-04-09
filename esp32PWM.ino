@@ -1,9 +1,9 @@
-const int pwma = 2;  /* GPIO2 */
-const int pwmb = 4; 
-const int pwmc = 6; 
+const int pwma = 4;  /* GPIO4 */
+const int pwmb = 3; 
+const int pwmc = 2; 
 const int ena = 8;
-const int enb = 10;
-const int enc = 12;
+const int enb = 7;
+const int enc = 6;
 
 int dutyCycle;
 /*Frequency: max 40MHz*/
