@@ -1,9 +1,5 @@
-const int pwma = 4;  /* GPIO4 */
-const int pwmb = 3; 
-const int pwmc = 2; 
-const int ena = 8;
-const int enb = 7;
-const int enc = 6;
+const int pwm[3] = {4,3,2}; //GPIO{4,3,2}
+const int en[3] = {8,7,6};
 
 int dutyCycle;
 /*Frequency: max 40MHz*/
@@ -13,72 +9,37 @@ const int PWMResolution = 10;
 /*Duty cycle dependent on resolution*/
 const int MAX_DUTY_CYCLE = (int)(pow(2, PWMResolution) - 1);
 /*PWM channels: 0-15*/
-const int pwmaChannel = 0;
-const int pwmbChannel = 1;
-const int pwmcChannel = 2;
+const int pwmChannel[3] = {0,1,2};
 void setup()
 {
   /*Setup enable pins*/
-  pinMode(ena, OUTPUT);
-  pinMode(enb, OUTPUT);
-  pinMode(enc, OUTPUT);
+  for(int i=0; i<3; i++){
+    pinMode(en[i], OUTPUT);
+  }
   
-  /*Initialize channels*/  
-  ledcSetup(pwmaChannel, PWMFreq, PWMResolution);
-  ledcSetup(pwmbChannel, PWMFreq, PWMResolution);
-  ledcSetup(pwmcChannel, PWMFreq, PWMResolution);
+  /*Initialize channels*/
+  for(int i=0; i<3; i++){
+    ledcSetup(pwmChannel[i], PWMFreq, PWMResolution);
+  }
   /* Attach the PWM Channels to the GPIO Pin */
-  ledcAttachPin(pwma, pwmaChannel);
-  ledcAttachPin(pwmb, pwmbChannel);
-  ledcAttachPin(pwmc, pwmcChannel);
+  for(int i=0; i<3; i++){
+    ledcAttachPin(pwm[i], pwmChannel[i]);
+  }
 }
 void loop()
 {
-  /*Phase A*/
-  digitalWrite(ena, HIGH);
-  for(dutyCycle = 0; dutyCycle <= MAX_DUTY_CYCLE; dutyCycle++)
-  {
-    ledcWrite(pwmaChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
+  for(int i=0; i<3; i++){
+    digitalWrite(en[i], HIGH);
+    for(dutyCycle = 0; dutyCycle <= MAX_DUTY_CYCLE; dutyCycle++)
+    {
+      ledcWrite(pwmChannel[i], dutyCycle);
+      delay(1);
+    }
+    for(dutyCycle = MAX_DUTY_CYCLE; dutyCycle >= 0; dutyCycle--)
+    {
+      ledcWrite(pwmChannel[i], dutyCycle);
+      delay(1);
+    }
+    digitalWrite(en[i], LOW);
   }
-  for(dutyCycle = MAX_DUTY_CYCLE; dutyCycle >= 0; dutyCycle--)
-  {
-    ledcWrite(pwmaChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
-  }
-  digitalWrite(ena, LOW);
-
-  /*Phase B*/
-  digitalWrite(enb, HIGH);
-  for(dutyCycle = 0; dutyCycle <= MAX_DUTY_CYCLE; dutyCycle++)
-  {
-    ledcWrite(pwmbChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
-  }
-  for(dutyCycle = MAX_DUTY_CYCLE; dutyCycle >= 0; dutyCycle--)
-  {
-    ledcWrite(pwmbChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
-  }
-  digitalWrite(enb, LOW);
-
-  /*Phase C*/
-  digitalWrite(enc, HIGH);
-  for(dutyCycle = 0; dutyCycle <= MAX_DUTY_CYCLE; dutyCycle++)
-  {
-    ledcWrite(pwmcChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
-  }
-  for(dutyCycle = MAX_DUTY_CYCLE; dutyCycle >= 0; dutyCycle--)
-  {
-    ledcWrite(pwmcChannel, dutyCycle);
-    delay(3);
-    //delayMicroseconds(100);
-  }
-  digitalWrite(enc, LOW);
 }
