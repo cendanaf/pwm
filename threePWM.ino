@@ -9,15 +9,16 @@ const int PWMFreq = 5000; //5 KHz
 const int PWMResolution = 10; //1-16 bits (10 bits = 1024 bins)
 /*Duty cycle dependent on resolution*/
 const int MAX_DUTY_CYCLE = (int)(pow(2, PWMResolution) - 1);
+const int LIMIT_MAX_DUTY_CYCLE = (int) (0.49 * MAX_DUTY_CYCLE);
 
 int pwmA[MAX_DUTY_CYCLE];
 int pwmB[MAX_DUTY_CYCLE];
 int pwmC[MAX_DUTY_CYCLE];
 
-float phaseB = 3.14 * (30./180.);
-float phaseC = 3.14 * (60./180.);
+float phaseB = 3.14 * (60./180.);
+float phaseC = 3.14 * (120./180.);
 
-const int d = 10;
+const int d = 5;
 boolean forward = true;
 int phase = 0;
 int increment;
@@ -29,10 +30,21 @@ void setup() {
     float angleB = angleA + phaseB;
     float angleC = angleA + phaseC;
 
-    pwmA[i] = (int)(((MAX_DUTY_CYCLE/2) * sin(angleA)) + (MAX_DUTY_CYCLE/2));
-    pwmB[i] = (int)(((MAX_DUTY_CYCLE/2) * sin(angleB)) + (MAX_DUTY_CYCLE/2));
-    pwmC[i] = (int)(((MAX_DUTY_CYCLE/2) * sin(angleC)) + (MAX_DUTY_CYCLE/2));
+    float sinA = 0.5 * (sin(angleA) + 1);
+    float sinB = 0.5 * (sin(angleB) + 1);
+    float sinC = 0.5 * (sin(angleC) + 1);
 
+    //int A = (int)(((MAX_DUTY_CYCLE/2) * sin(angleA)) + (MAX_DUTY_CYCLE/2));
+    //int B = (int)(((MAX_DUTY_CYCLE/2) * sin(angleB)) + (MAX_DUTY_CYCLE/2));
+    //int C = (int)(((MAX_DUTY_CYCLE/2) * sin(angleC)) + (MAX_DUTY_CYCLE/2));
+
+    //pwmA[i] = (int) (constrain(A, 0, LIMIT_MAX_DUTY_CYCLE));
+    //pwmB[i] = (int) (constrain(B, 0, LIMIT_MAX_DUTY_CYCLE));
+    //pwmC[i] = (int) (constrain(C, 0, LIMIT_MAX_DUTY_CYCLE));
+
+    pwmA[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinA);
+    pwmB[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinB);
+    pwmC[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinC);
     
   }
 
@@ -58,6 +70,9 @@ void loop() {
   phase = phase + increment;
   if(phase > MAX_DUTY_CYCLE) phase = 0;
   if(phase < 0) phase = MAX_DUTY_CYCLE;
+
+  Serial.println(String(pwmA[phase]) + ", " + String(pwmB[phase]) + ", " + String(pwmC[phase]));
+  
 
   delay(d); 
 
