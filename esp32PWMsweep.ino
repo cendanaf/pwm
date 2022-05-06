@@ -4,20 +4,18 @@ const int pwmChannel[3] = {0,1,2}; //PWM channels (0-15)
 
 int dutyCycle;
 /*Frequency: max 40MHz*/
-const int PWMFreq = 10000; //Hz
+const int PWMFreq = 39000; //Hz
 /*Resolution: 1-16 bits*/
 const int PWMResolution = 10;
 /*Duty cycle dependent on resolution*/
 const int MAX_DUTY_CYCLE = (int)(pow(2, PWMResolution) - 1);
 
-const int LIMIT_MAX_DUTY_CYCLE = (int) (1 * MAX_DUTY_CYCLE);
-
 int pwmA[MAX_DUTY_CYCLE];
 int pwmB[MAX_DUTY_CYCLE];
 int pwmC[MAX_DUTY_CYCLE];
 
-float phaseB = 3.14 * (30./180.);
-float phaseC = 3.14 * (60./180.);
+float phaseB = 3.14 * (120./180.);
+float phaseC = 3.14 * (240./180.);
 
 const int d = 5;
 boolean forward = true;
@@ -47,13 +45,9 @@ void setup()
     float angleB = angleA + phaseB;
     float angleC = angleA + phaseC;
 
-    float sinA = 0.5 * (sin(angleA) + 1);
-    float sinB = 0.5 * (sin(angleB) + 1);
-    float sinC = 0.5 * (sin(angleC) + 1);
-
-    pwmA[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinA);
-    pwmB[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinB);
-    pwmC[i] = (int) (LIMIT_MAX_DUTY_CYCLE * sinC);
+    pwmA[i] = (int) (0.5 * MAX_DUTY_CYCLE * (sin(angleA) + 1));
+    pwmB[i] = (int) (0.5 * MAX_DUTY_CYCLE * (sin(angleB) + 1));
+    pwmC[i] = (int) (0.5 * MAX_DUTY_CYCLE * (sin(angleC) + 1));
     
   }
 
