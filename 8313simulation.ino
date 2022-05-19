@@ -4,7 +4,7 @@ const int pwmChannel[3] = {0,1,2}; //PWM channels (0-15)
 
 int dutyCycle;
 /*Frequency: max 40MHz*/
-const int PWMFreq = 5000; //5 KHz
+const int PWMFreq = 20000; //5 KHz
 /*Resolution: 1-16 bits*/
 const int PWMResolution = 10; //1-16 bits (10 bits = 0-1023)
 /*Duty cycle dependent on resolution*/
@@ -38,20 +38,20 @@ void setup()
 void loop() {
   Serial.println("Wave 1");
   digitalWrite(en[0], HIGH);
-  ledcWrite(pwmChannel[0], 0.1*MAX_DUTY_CYCLE);
+  ledcWrite(pwmChannel[0], 0.11*MAX_DUTY_CYCLE);
   delay(d);
 
   Serial.println("Wave 2");
   ledcWrite(pwmChannel[0], 0);
   digitalWrite(en[1], HIGH);
-  ledcWrite(pwmChannel[1], 0.1*MAX_DUTY_CYCLE);
+  ledcWrite(pwmChannel[1], 0.11*MAX_DUTY_CYCLE);
   delay(d);
 
   Serial.println("Wave 3");
   ledcWrite(pwmChannel[1], 0);
   digitalWrite(en[0], LOW);
   digitalWrite(en[2], HIGH);
-  ledcWrite(pwmChannel[2], 0.1*MAX_DUTY_CYCLE);
+  ledcWrite(pwmChannel[2], 0.11*MAX_DUTY_CYCLE);
   delay(d);
 
   Serial.println("------");
