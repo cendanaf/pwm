@@ -19,6 +19,8 @@ int pwmA[MAX_DUTY_CYCLE];
 int pwmStatus[3];
 int enStatus[3];
 
+int duty = (int) (0.1*MAX_DUTY_CYCLE);
+
 boolean forward = true;
 boolean pwmSwitchState;
 boolean enSwitchState;
@@ -42,6 +44,8 @@ void setup() {
     pinMode(en[i], OUTPUT);
     pinMode(pwmPins[i], INPUT_PULLUP);
     pinMode(enPins[i], INPUT_PULLUP);
+    ledcSetup(pwmChannel[i], PWMFreq, PWMResolution);
+    ledcAttachPin(pwm[i], pwmChannel[i]);
   }
 
   Serial.begin(9600);
@@ -61,10 +65,12 @@ void loop() {
 
     if(pwmSwitchState != pwmStatus[i]){
       if(pwmSwitchState == 0){
-        analogWrite(pwm[i], 0);
+      //analogWrite(pwm[i], 0);
+      ledcWrite(pwmChannel[i], 0);
       }
       else{
-        analogWrite(pwm[i], 0.1*MAX_DUTY_CYCLE);
+      //analogWrite(pwm[i], 0.1*MAX_DUTY_CYCLE);
+      ledcWrite(pwmChannel[i], duty);
       }
       pwmStatus[i] = pwmSwitchState;
     }
