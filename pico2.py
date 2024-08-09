@@ -2,13 +2,16 @@ from machine import Pin, PWM
 import math
 import time
 
-hsa = PWM(Pin(1))
-hsb = PWM(Pin(2))
-hsc = PWM(Pin(3))
+hsa = PWM(Pin(0))
+lsa = Pin(1, Pin.OUT)
 
-lsa = Pin(4, Pin.OUT)
-lsb = Pin(5, Pin.OUT)
-lsc = Pin(6, Pin.OUT)
+hsb = PWM(Pin(2))
+lsb = Pin(3, Pin.OUT)
+
+hsc = PWM(Pin(4))
+lsc = Pin(5, Pin.OUT)
+
+hsd = PWM(Pin(6)) # reference (for oscilloscope)
 
 PWMfreq = 20000 # Hz
 sinusoidPeriod = 250 # ms
