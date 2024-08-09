@@ -3,9 +3,16 @@ import math
 import time
 import sys
 
-hsa = PWM(Pin(1))
+hsa = PWM(Pin(0))
+lsa = Pin(1, Pin.OUT)
+
 hsb = PWM(Pin(2))
-hsc = PWM(Pin(3))
+lsb = Pin(3, Pin.OUT)
+
+hsc = PWM(Pin(4))
+lsc = Pin(5, Pin.OUT)
+
+hsd = PWM(Pin(6)) # reference (for oscilloscope)
 
 f = 20000
 hsa.freq(f)
@@ -16,10 +23,6 @@ voltageResolution = 16 # bits
 nVoltages = (2**voltageResolution) - 1
 dutyCycleLimiter = 0.5
 duty = int(nVoltages/2)
-
-lsa = Pin(4, Pin.OUT)
-lsb = Pin(5, Pin.OUT)
-lsc = Pin(6, Pin.OUT)
 
 button = Pin(9, Pin.IN, Pin.PULL_DOWN)
 
