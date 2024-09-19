@@ -1,17 +1,32 @@
 from machine import Pin, ADC
-from rp2 import PIO, StateMachine, asm_pio
+from rp2 import PIO, StateMachine, asm_pio, asm_pio_encode
 import utime
+import time
 
-@asm_pio(sideset_init=PIO.OUT_LOW)
+@asm_pio(sideset_init=(PIO.OUT_LOW, PIO.OUT_LOW))
 def PWM():
-    pull(noblock) .side(0)
-    mov(x, osr) # Keep most recent pull data stashed in X, for recycling by noblock
-    mov(y, isr) # ISR must be preloaded with PWM count max
-    label("pwmloop")
-    jmp(x_not_y, "skip")
-    irq(0)         .side(1)
-    label("skip")
-    jmp(y_dec, "pwmloop")
+    pull(noblock)    .side(0b00)
+    mov(x, osr) 
+    mov(y, isr) 
+    
+    label("pwmloop1") # 1st stage turns side pin on
+    jmp(x_not_y, "skip1")
+    nop()         .side(0b11) 
+    jmp("transition")
+    
+    label("skip1")
+    jmp(y_dec, "pwmloop1")
+    
+    label("transition") # Transition stage (supposedly) doubles the value of x
+    mov(x, x << 1)
+    jmp("pwmloop2")
+    
+    label("pwmloop2") # 2nd stage raises flag (at midpoint)
+    jmp(x_not_y, "skip2")
+    nop()            .side(0b01)
+    
+    label("skip2")
+    jmp(y_dec, "pwmloop2")
 
 
 class PIOPWM:
@@ -39,10 +54,13 @@ class PIOPWM:
         self._sm.put(value)
         
     def Sample(self, sm):
-        self._marker.value(1)
-        utime.sleep_us(self._half_pulse)
+        #self._marker.value(1)
+        #t0 = time.time_ns()
+        #utime.sleep_us(self._half_pulse)
         self._adc_value = self._adc.read_u16()
-        self._marker.value(0)
+        #t = time.time_ns()
+        #print(f"{t-t0}")
+        #self._marker.value(0)
     
     def GetADCvalue(self):
         return self._adc_value
