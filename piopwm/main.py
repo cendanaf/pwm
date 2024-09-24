@@ -11,7 +11,7 @@ pwm = PIOPWM(0, 17, 26, max_count=time_slices, count_freq=25_650_000)
 #duty = int(0.2 * time_slices)
 #pwm.Set(duty)
 
-i = int(0.2 * time_slices)
+i = int(1 * time_slices)
 pwm.Set(i)
 
 #i = 0
