@@ -12,112 +12,68 @@ adc_pin = 26
 pwm_pin = 16
 dma_channel = 0
 
-HS_pins = [16, 18, 20]
-LS_pins = [17, 19, 21]
-HS = [ PWM(Pin(i)) for i in HS_pins ]
-LS = [ Pin(i, Pin.OUT) for i in LS_pins ]
-
-pwm_slice_num = [ (pin >> 1) & 7 for pin in HS_pins ]
-
-PWMfreq = 20_000
-for pwm in HS:
-    pwm.freq(PWMfreq)
-
-HS[0].duty_u16(int(0.2 * nVoltages))
-HS[1].duty_u16(int(0.2 * nVoltages))
-HS[2].duty_u16(int(0.2 * nVoltages))
 
 ###########################
 ######  PWM Registers #####
 ###########################
-# RP2040 datasheet page 533
-PWM_BASE = 0x40050000
-PWM_EN = PWM_BASE + 0xa0
+PWM_BASE          = 0x40050000
+PWM_CHANNEL_WIDTH = 0x14
 
 pwm_slice = (pwm_pin >> 1) & 7
-#pwm_offset
+pwm_channel_offset = pwm_slice * PWM_CHANNEL_WIDTH
 
-# Channels 16, 18, 20 are mapped to 0A, 1A, 2A
-# So we need CH0, CH1, CH2
-CH0_CSR = PWM_BASE + 0x00 # Control and status register
-CH0_DIV = PWM_BASE + 0x04 # Clock divider
-CH0_CTR = PWM_BASE + 0x08 # Counter
-CH0_CC  = PWM_BASE + 0x0c # Counter compare
-CH0_TOP = PWM_BASE + 0x10 # Counter wrap
+PWM_CSR = PWM_BASE | (0x00 + pwm_channel_offset) # Control and status
+PWM_DIV = PWM_BASE | (0x04 + pwm_channel_offset) # Clock divider
+PWM_CTR = PWM_BASE | (0x08 + pwm_channel_offset) # PWM counter
+PWM_CC  = PWM_BASE | (0x0c + pwm_channel_offset) # Counter compare
+PWM_TOP = PWM_BASE | (0x10 + pwm_channel_offset) # Counter wrap
 
-CH1_CSR = PWM_BASE + 0x14 # Control and status register
-CH1_DIV = PWM_BASE + 0x18 # Clock divider
-CH1_CTR = PWM_BASE + 0x1c # Counter
-CH1_CC  = PWM_BASE + 0x20 # Counter compare
-CH1_TOP = PWM_BASE + 0x24 # Counter wrap
-
-CH2_CSR = PWM_BASE + 0x28 # Control and status register
-CH2_DIV = PWM_BASE + 0x2c # Clock divider
-CH2_CTR = PWM_BASE + 0x30 # Counter
-CH2_CC  = PWM_BASE + 0x34 # Counter compare
-CH2_TOP = PWM_BASE + 0x38 # Counter wrap
-
-# Disable all PWMs
-mem32[PWM_EN] = 0
-
-# Reset Counters
-mem32[CH0_CTR] = 0
-mem32[CH1_CTR] = 0 
-mem32[CH2_CTR] = 0
-
-#PWM_DIV = 125
-#mem32[CH0_DIV] = PWM_DIV
-#mem32[CH1_DIV] = PWM_DIV
-#mem32[CH1_DIV] = PWM_DIV
-
-#PWM_WRAP = 49
-#mem32[CH0_TOP] = PWM_WRAP
-#mem32[CH1_TOP] = PWM_WRAP
-#mem32[CH2_TOP] = PWM_WRAP
-
-#PWM_LEVEL = int(0.2 * nVoltages)
-#mem32[CH0_CC] = PWM_LEVEL
-#mem32[CH1_CC] = PWM_LEVEL
-#mem32[CH2_CC] = PWM_LEVEL
-
-#Enable PWMs sequentially
-#mem32[CH0_CSR] = 1
-#mem32[CH1_CSR] = 1
-#mem32[CH2_CSR] = 1
-
-# Enable PWMs simultaneously
-mask = 0
-for i in pwm_slice_num:
-    mask |= 1 << i
-mem32[PWM_EN] = mask
-
+PWM_EN  = PWM_BASE + 0xa0
 
 #############################
 ######  PAD Registers  ######
 #############################
-PAD_BASE        = 0x4001c000
+PAD_BASE            = 0x4001c000
 PAD_CHANNEL_WIDTH   = 0x04
-PAD_PIN_COUNT   = 30
+PAD_PIN_COUNT       = 30
 
-pad_channel_offset = (adc_pin + 1) * PAD_CHANNEL_WIDTH
+adc_pad_channel_offset = (adc_pin + 1) * PAD_CHANNEL_WIDTH
+pwm_pad_channel_offset = (pwm_pin + 1) * PAD_CHANNEL_WIDTH
 
-PAD = PAD_BASE | (0x00 + pad_channel_offset)
+ADC_PAD = PAD_BASE | (0x00 + adc_pad_channel_offset)
+PWM_PAD = PAD_BASE | (0x00 + pwm_pad_channel_offset)
 
 # Enable output disable PAD_OD(bit 7)
-mem32[PAD] |= (1 & 0x1) << 7
+mem32[ADC_PAD] |= (1 & 0x1) << 7
 # Do not enable input enable PAD_IE(bit 6)
-mem32[PAD] |= (0 & 0x1) << 6
+mem32[ADC_PAD] |= (0 & 0x1) << 6
 # Set PAD_DRIVE(bits 4:5) to 2mA
-mem32[PAD] = (0x00 & 0x03) << 4
+mem32[ADC_PAD] |= (0x00 & 0x03) << 4
 # Do not enable pull up PAD_PUE(bit 3)
-mem32[PAD] = (0 & 0x1) << 3
+mem32[ADC_PAD] |= (0 & 0x1) << 3
 # Do not enable pull down PAD_PDE(bit 2)
-mem32[PAD] = (0 & 0x1) << 2
+mem32[ADC_PAD] |= (0 & 0x1) << 2
 # Do not enable Schmitt trigger PAD_SCHMITT(bit 1)
-mem32[PAD] = (0 & 0x1) << 1
+mem32[ADC_PAD] |= (0 & 0x1) << 1
 # Slew rate slow PAD_SLEWFAST(bit 0)
-mem32[PAD] = (0 & 0x1) << 0 
-#print("PAD Registers initialized")
+mem32[ADC_PAD] |= (0 & 0x1) << 0 
+#print("ADC PAD Registers initialized")
+
+# Do not enable output disable PAD_OD(bit 7)
+mem32[PWM_PAD] |= (0 & 0x1) << 7
+# Do not enable input enable PAD_IE(bit 6)
+mem32[PWM_PAD] |= (1 & 0x1) << 6
+# Set PAD_DRIVE(bits 4:5) to 2mA
+mem32[PWM_PAD] |= (0x00 & 0x03) << 4
+# Do not enable pull up PAD_PUE(bit 3)
+mem32[PWM_PAD] |= (0 & 0x1) << 3
+# Do not enable pull down PAD_PDE(bit 2)
+mem32[PWM_PAD] |= (0 & 0x1) << 2
+# Do not enable Schmitt trigger PAD_SCHMITT(bit 1)
+mem32[PWM_PAD] |= (0 & 0x1) << 1
+# Slew rate fast PAD_SLEWFAST(bit 0)
+mem32[PWM_PAD] |= (1 & 0x1) << 0 
+#print("PWM PAD Registers initialized")
 
 #############################
 ######  GPIO Registers  #####
@@ -126,19 +82,23 @@ GPIO_BASE       = 0x40014000
 GPIO_CHANNEL_WIDTH = 0x08
 GPIO_PIN_COUNT  = 30
 
-gpio_channel_offset = adc_pin * GPIO_CHANNEL_WIDTH
+adc_gpio_channel_offset = adc_pin * GPIO_CHANNEL_WIDTH
+pwm_gpio_channel_offset = pwm_pin * GPIO_CHANNEL_WIDTH
 
-GPIO_STATUS = GPIO_BASE | (0x00 + gpio_channel_offset)
-GPIO_CTRL = GPIO_BASE | (0x04 + gpio_channel_offset)
+ADC_GPIO_STATUS = GPIO_BASE | (0x00 + adc_gpio_channel_offset)
+ADC_GPIO_CTRL   = GPIO_BASE | (0x04 + adc_gpio_channel_offset)
+
+PWM_GPIO_STATUS = GPIO_BASE | (0x00 + pwm_gpio_channel_offset)
+PWM_GPIO_CTRL   = GPIO_BASE | (0x04 + pwm_gpio_channel_offset)
 
 #print(hex(GPIO_CTRL))
-mem32[GPIO_CTRL] = 0x1f # GPIO_FUNC_NULL, gpio_set_function()
+mem32[ADC_GPIO_CTRL] = 0x1f # GPIO_FUNC_NULL, gpio_set_function()
+mem32[PWM_GPIO_CTRL] = 0x4  # gpio_set_function(pin, GPIO_FUNC_PWM)
 #print("GPIO Registers initialized")
 
 #############################
 ######  ADC Registers  ######
 #############################
-# No offset required as ADC can be treated as an entire unit(?)
 ADC_BASE      = 0x4004c000
 ADC_CS        = ADC_BASE + 0x00
 ADC_RESULT    = ADC_BASE + 0x04
@@ -149,7 +109,7 @@ ADC_DIV       = ADC_BASE + 0x10
 #############################
 ######  DMA Registers  ######
 #############################
-DMA_BASE        = 0x50000000
+DMA_BASE           = 0x50000000
 DMA_CHANNEL_WIDTH  = 0x40
 DMA_CHANNEL_COUNT  = 12
 
@@ -170,23 +130,59 @@ DMA_CHAN_ABORT = DMA_BASE | 0x444
 
 ##############################
 
-# PAD_REG = 0
-mem32[PAD] = 0
-# CS_REG = 0
-mem32[ADC_CS] = 0
-# FCS_REG = 0
-mem32[ADC_FCS] = 0
-# ADC_CS_EN = 1
-mem32[ADC_CS] |= (1 & 0x1) << 0       
-# ADC_CS_AINSEL (bits 12:14) = {0, 1, 2, 3, 4}
-# Start sampling at ADC channel 1
-mem32[ADC_CS] |= (1 & 0x07) << 12
-# ADC_CS_RROBIN (bits 16:20) = 0001
-# Do a round robin sampling of ADC channel 0 only
-mem32[ADC_CS] |= (0x01 & 0x1f) << 16  
 
-#mem32[ADC_CS] |= (1 & 0x1) << 2       # ADC_CS_START_ONCE (bit 2) = 1
-#print(mem32[ADC_RESULT])
+#pwm = PWM(Pin(pwm_pin, Pin.OUT))
+#pwm.freq(20_000)
+#pwm.duty_u16(int(0.2*nVoltages))
+
+#for i in range(10):
+#    a = (mem32[PWM_CTR] >> 0) & 0xffff
+#    print(int(a))
+
+# Disable all PWMs
+mem32[PWM_EN] = 0
+
+# Default options/reset CSR and counters
+# (no PH_ADV or PH_RET, Free running, No inversion, trailing edge)
+mem32[PWM_CSR] = 0
+mem32[PWM_DIV] = 0
+mem32[PWM_CTR] |= (0x0 & 0xffff) << 0 # Bits 0:15
+
+# set_clkdiv_int_frac(div, 0)
+pwm_div_int  = 1
+pwm_div_frac = 0
+mem32[PWM_DIV] |= (pwm_div_int & 0xff) << 4 #  Bits 4:11
+mem32[PWM_DIV] |= (pwm_div_frac & 0xf) << 0 #  Bits 0:3
+
+# set_wrap(wrap)
+pwm_wrap = 0xffff
+mem32[PWM_TOP] |= (pwm_wrap & 0xffff) << 0 # Bits 0:15 for channel A
+
+# Set Counter compare
+pwm_level = int(0.2 * nVoltages)
+mem32[PWM_CC] |= (pwm_level & 0xffff) << 0 # Bits 0:15 for channel A
+
+# Enable PWMs simultaneously
+mask = 0
+for i in range(1):
+    mask |= 1 << i
+mem32[PWM_EN] = mask
+
+
+
+mem32[ADC_CS] = 0 # CS_REG = 0
+mem32[ADC_FCS] = 0 # FCS_REG = 0
+mem32[ADC_CS] |= (1 & 0x1) << 0  # ADC_CS_EN = 1     
+# Start sampling at ADC channel 2
+mem32[ADC_CS] |= (2 & 0x07) << 12 # ADC_CS_AINSEL (bits 12:14) = {0, 1, 2, 3, 4}
+# Do a round robin sampling of only one channel (ADC channel 2)
+mem32[ADC_CS] |= (0x4 & 0x1f) << 16  # ADC_CS_RROBIN (bits 16:20) = 0100
+
+"""
+# Checks if ADC is working
+mem32[ADC_CS] |= (1 & 0x1) << 2     # ADC_CS_START_ONCE (bit 2) = 1
+print(mem32[ADC_RESULT])
+"""
 
 # adc_fifo_setup()
 # Allow conversion result to be written into FIFO (instead of RESULT)
@@ -242,7 +238,6 @@ mem32[DMA_WRITE_ADDR] = uctypes.addressof(adc_buff)
 mem32[DMA_TRANS_COUNT] = NSAMPLES
 
 
-
 # dma_channel_start()
 mem32[DMA_CTRL_TRIG] |= (1 & 0x1) << 0 # CTRL_TRIG_EN(bit 0) = 1
 
@@ -250,46 +245,12 @@ mem32[DMA_CTRL_TRIG] |= (1 & 0x1) << 0 # CTRL_TRIG_EN(bit 0) = 1
 mem32[ADC_CS] |= (1 & 0x1) << 3 # ADC_CS_START_MANY(bit 3) = 1
 
 # ADC running
-adc_running = mem32[DMA_CTRL_TRIG] >> 24
+adc_running = (mem32[DMA_CTRL_TRIG] >> 24) & 0x1
 while adc_running:
     utime.sleep_ms(10)
-    adc_running = mem32[DMA_CTRL_TRIG] >> 24
+    adc_running = (mem32[DMA_CTRL_TRIG] >> 24) & 0x1
 # adc_run(false)
 mem32[ADC_CS] |= (0 & 0x1) << 3 # ADC_CS_START_MANY(bit 3) = 1
 
 vals = [f"{val}" for val in adc_buff]
 print(vals)
-
-#a = adc.read_u16()
-#print(a)
-#reg = mem32[ADC_CS]
-#print(reg)
-"""
-# CS Registers
-print("Setting CS registers")
-ADC_CS_EN         =  (mem32[ADC_CS] >> 0)  & 0x01
-print("ADC_CS_EN")
-ADC_CS_AINSEL     =  (mem32[ADC_CS] >> 12) & 0x07
-ADC_CS_START_ONCE =  (mem32[ADC_CS] >> 2)  & 0x01
-
-mem32[ADC_CS_EN] = 0
-mem32[ADC_CS_AINSEL] = 0 # ADC channel 0
-mem32[ADC_CS_EN] = 1
-
-
-for i in range(3):
-    mem32[ADC_CS_START_ONCE] = 1
-    print(mem32[ADC_RESULT])
-"""
-"""
-mem32[ADC_CS] = 0
-mem32[ADC_CS_EN] = 0
-mem32[ADC_CS_AINSEL] = 0
-
-RROBIN = (mem32[ADC_CS] >> 16) & 0x1F # Address (Bits 20:16 in ADC_CS)
-mem32[ADC_CS] &= ~(0x1F<<16)          # Writing
-mem32[ADC_CS] |= (value&0x1F)<<16
-
-AINSEL = (mem32[ADC_CS] >> 12) & 0x07
-"""
-
