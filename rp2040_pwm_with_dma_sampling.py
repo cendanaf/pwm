@@ -49,7 +49,18 @@ def PWM_CSR(slice_num):
 
 def PWM_divmode(mode):
     return (mode & 0x03)<<4
-
+# invert channel B
+PWM_B_inv = 1<<3
+# invert channel A
+PWM_A_inv = 1<<2
+# phase correct
+PWM_ph_correct = 1<<1
+# enable channel
+#PWM_EN = 1
+#
+# divide register
+# 12-bit fixed point
+# with binary point betweem bit3 and bit4
 def PWM_DIV(slice_num):
     return (0x14 * slice_num + PWM_base + 0x04)
 
@@ -73,26 +84,34 @@ PWM_FN = 4
 pwm_mask = 0
 free_run = 0
 
+# Disable all PWMs
+IOreg_write(PWM_EN, 0)
+
+# Reset counters
+IOreg_write(PWM_CTR(GPIO2SliceNum(0)), 0)
+IOreg_write(PWM_CTR(GPIO2SliceNum(4)), 0)
+
 IOreg_write(GPIO_CTRL(0), PWM_FN )# pwm function slice 0A
 IOreg_write(GPIO_CTRL(4), PWM_FN ) # pwm function slice 2A
 
 
 # channel 0
+# divider of value unity clocks at cpu rate (125MHz)
 wrapVal = 6249
 #cc = int(0.2 * wrapVal) # 1249 (10us)
 #cc = 749 #6us
 cc = 812 #6.5 us
 #cc = 874 #7us
-IOreg_write(PWM_DIV(0), 1<<4) 
-IOreg_write(PWM_TOP(0), wrapVal)
-IOreg_write(PWM_CC(0), cc) 
-IOreg_write(PWM_CSR(0), PWM_divmode(free_run))
+IOreg_write(PWM_DIV(GPIO2SliceNum(0)), 1<<4) # binary 1 in 8.4 fixed pt
+IOreg_write(PWM_TOP(GPIO2SliceNum(0)), wrapVal)
+IOreg_write(PWM_CC(GPIO2SliceNum(0)), cc) 
+IOreg_write(PWM_CSR(GPIO2SliceNum(0)), PWM_divmode(free_run))
 pwm_mask |= 1 << GPIO2SliceNum(0)
 
 # channel 4
-wrapVal = 624
-cc = int(wrapVal/2)
-IOreg_write(PWM_DIV(GPIO2SliceNum(4)), 1<<4) 
+wrapVal = 6249
+cc = 1249
+IOreg_write(PWM_DIV(GPIO2SliceNum(4)), 1<<4) # binary 1 in 8.4 fixed pt
 IOreg_write(PWM_TOP(GPIO2SliceNum(4)), wrapVal) 
 IOreg_write(PWM_CC(GPIO2SliceNum(4)), cc) 
 IOreg_write(PWM_CSR(GPIO2SliceNum(4)), PWM_divmode(free_run))
@@ -120,6 +139,7 @@ def ADC_READY(ready):
 
 ADC_START_MANY = (1<<3)
 ADC_START_ONCE = (1<<2)
+ADC_TS_EN = (1<<1) # Temperature sensor
 ADC_EN = 1 # Power on ADC and enable its clock.
 
 # === bits in ADC_FIFO CS
@@ -127,7 +147,10 @@ def ADC_THRESH(fifo_level):
     return (fifo_level & 0x0f)<<24
 
 ADC_DREQ_EN = (1<<3)
-
+# If 1: FIFO results are right-shifted to be one byte in size.
+# Enables DMA to byte buffers.
+ADC_SHIFT = (1<<1)
+# enable fifo
 ADC_FIFO_EN = 1
 
 def ADC_Div_int(int_part):
@@ -155,6 +178,7 @@ IOreg_write(ADC_DIV, ADC_Div_int(96) | ADC_Div_frac(0))
 print(bin(machine.mem32[ADC_CS]))
 IOreg_write(ADC_CS, (ADC_RROBIN(0x7) |
                         ADC_AINSEL(0) |
+                        #ADC_START_MANY |
                         ADC_EN))
 print(bin(machine.mem32[ADC_CS]))
 """
@@ -201,9 +225,7 @@ DMA_IRQ_QUIET = (1<<21) # bit 21 turn off interrupt
 
 def DMA_TREQ(trigger_source):
     return (trigger_source & 0x3f)<<15
-# When this channel completes, it will trigger the channel
-# indicated by CHAIN_TO. Disable by setting CHAIN_TO =
-# (this channel).
+
 def DMA_CHAIN_TO (next_ch):
     return (next_ch & 0x0f)<<11 # bits 11:14 next chnnel #
 
@@ -215,13 +237,14 @@ DMA_RD_INC = (1<<4) # bits 4
 data_8  = 0x00
 data_16 = 0x01
 data_32 = 0x02
+
 def DMA_DATA_WIDTH(data_width):
     return (data_width & 0x03)<<2 # bits 2:3
 
 DMA_EN = 1 # bits 0
 
-DREQ_ADC = 36 # control DREQ ADC
-DREQ_TIMER0 = 0x3b # data request source number Timer0
+DREQ_ADC = 36 # conttrol DREQ ADC
+DREQ_TIMER0 = 0x3b # dat request souce number Timer0
 DREQ_PWM_WRAP0 = 24
 
 
@@ -234,8 +257,6 @@ adc_dma_chan3 = 6
 adc_dma_chan2 = 5
 adc_dma_chan1 = 4
 sig_dma_chan = 1
-rst_adc_dma_chan = 0
-tmr_dma_chan = 7
 
 dma_mask = 0
 for i in range(7):
@@ -300,18 +321,6 @@ IOreg_write(DMA_CTRL(adc_dma_chan1), DMA_IRQ_QUIET |
                         DMA_CHAIN_TO(adc_dma_chan2) )
 
 
-# Timer DMA channel
-#machine.mem32[DMA_TIMER0] = (0x68 << 16) | (0xffff)
-#IOreg_write(DMA_TIMER0, ((0x68 << 16) | (0xffff)))
-IOreg_write(DMA_RD_ADDR(tmr_dma_chan), DMA_RD_ADDR(tmr_dma_chan))
-IOreg_write(DMA_WR_ADDR(tmr_dma_chan), DMA_RD_ADDR(tmr_dma_chan))
-IOreg_write(DMA_TR_COUNT(tmr_dma_chan), 5)
-IOreg_write(DMA_CTRL(tmr_dma_chan), DMA_IRQ_QUIET |
-                            DMA_TREQ(DREQ_TIMER0) | 
-                            DMA_DATA_WIDTH(data_32) |
-                            DMA_CHAIN_TO(adc_dma_chan1) )
-
-
 
 # Waits for the start of a PWM pulse to run ADC sampling
 IOreg_write(DMA_RD_ADDR(sig_dma_chan), addressof(run_adc))
@@ -323,26 +332,13 @@ IOreg_write(DMA_CTRL(sig_dma_chan), DMA_IRQ_QUIET |
                             DMA_CHAIN_TO(adc_dma_chan1) )
 
 
-
-# Resets DMA2 to write at the beginning of the ADC buffer
-IOreg_write(DMA_RD_ADDR(rst_adc_dma_chan), addressof(pause_pwm))
-IOreg_write(DMA_WR_ADDR(rst_adc_dma_chan), PWM_EN)
-IOreg_write(DMA_TR_COUNT(rst_adc_dma_chan), 1)
-IOreg_write(DMA_CTRL(rst_adc_dma_chan), DMA_IRQ_QUIET |
-                            DMA_DATA_WIDTH(data_32) |
-                            DMA_CHAIN_TO(rst_adc_dma_chan) )
-
-
 #machine.mem32[DMA_multi_chan_enable] |= dma_mask # doesn't work
 
 machine.mem32[DMA_CTRL(stp_adc_dma_chan)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan3)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan2)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan1)] |= DMA_EN
-#machine.mem32[DMA_CTRL(tmr_dma_chan)] |= DMA_EN
 machine.mem32[DMA_CTRL(sig_dma_chan)] |= DMA_EN
-
-#machine.mem32[DMA_CTRL(rst_adc_dma_chan)] |= DMA_EN
 
 
 try:
