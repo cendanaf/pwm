@@ -4,6 +4,19 @@ import machine
 import math
 from uctypes import addressof
 
+# Pins
+hsc = 20
+hsb = 18
+hsa = 16
+lsc = 21
+lsb = 19
+lsa = 17
+pwm_ref = 14
+
+LSA = machine.Pin(lsa, machine.Pin.OUT)
+LSA.high()
+
+
 # ====================================
 # === Register write functions =======
 
@@ -53,7 +66,7 @@ PWM_ph_correct = 1<<1
 def PWM_DIV(slice_num):
     return (0x14 * slice_num + PWM_base + 0x04)
 
-# the actual PWM 16-bit couonter
+# the actual PWM 16-bit counter
 def PWM_CTR(slice_num):
     return (0x14 * slice_num + PWM_base + 0x08)
 
@@ -79,37 +92,66 @@ IOreg_write(PWM_EN, 0)
 
 
 # Reset counters
-IOreg_write(PWM_CTR(GPIO2SliceNum(0)), 0)
-IOreg_write(PWM_CTR(GPIO2SliceNum(4)), 0)
+IOreg_write(PWM_CTR(GPIO2SliceNum(pwm_ref)), 0)
+IOreg_write(PWM_CTR(GPIO2SliceNum(hsa)), 0)
+IOreg_write(PWM_CTR(GPIO2SliceNum(hsb)), 0)
+IOreg_write(PWM_CTR(GPIO2SliceNum(hsc)), 0)
 
-IOreg_write(GPIO_CTRL(0), PWM_FN ) # pwm function slice 0A
-IOreg_write(GPIO_CTRL(4), PWM_FN ) # pwm function slice 2A
+IOreg_write(GPIO_CTRL(pwm_ref), PWM_FN ) # pwm function slice 0A
+IOreg_write(GPIO_CTRL(hsa), PWM_FN ) # pwm function slice 1A
+IOreg_write(GPIO_CTRL(hsb), PWM_FN ) # pwm function slice 2A
+IOreg_write(GPIO_CTRL(hsc), PWM_FN ) # pwm function slice 3A
 
 # Shift PWM0
-shift = ((2**16)-1) - 625
-IOreg_write(PWM_CTR(GPIO2SliceNum(0)), shift)
+shift = ((2**16)-1) - 625 #5us
+IOreg_write(PWM_CTR(GPIO2SliceNum(pwm_ref)), shift)
+
+# Shift PWM4
+shift = ((2**16)-1) - 250 #2us
+#IOreg_write(PWM_CTR(GPIO2SliceNum(hsb)), shift)
+
+# Shift PWM6
+shift = ((2**16)-1) - 500 #4us
+#IOreg_write(PWM_CTR(GPIO2SliceNum(hsc)), shift)
 
 
 
 
-
-# channel 0
+# pwm reference channel
 wrapVal = 6249
-cc = 749 
-IOreg_write(PWM_DIV(0), 1<<4)
-IOreg_write(PWM_TOP(0), wrapVal)
-IOreg_write(PWM_CC(0), cc) 
-IOreg_write(PWM_CSR(0), PWM_divmode(free_run))
-pwm_mask |= 1 << GPIO2SliceNum(0)
+cc = 750 
+IOreg_write(PWM_DIV(GPIO2SliceNum(pwm_ref)), 1<<4)
+IOreg_write(PWM_TOP(GPIO2SliceNum(pwm_ref)), wrapVal)
+IOreg_write(PWM_CC(GPIO2SliceNum(pwm_ref)), cc) 
+IOreg_write(PWM_CSR(GPIO2SliceNum(pwm_ref)), PWM_divmode(free_run))
+pwm_mask |= 1 << GPIO2SliceNum(pwm_ref)
 
-# channel 4
+# pwm hsa
 wrapVal = 6249
-cc = 1249 + 187
-IOreg_write(PWM_DIV(GPIO2SliceNum(4)), 1<<4)
-IOreg_write(PWM_TOP(GPIO2SliceNum(4)), wrapVal) 
-IOreg_write(PWM_CC(GPIO2SliceNum(4)), cc) 
-IOreg_write(PWM_CSR(GPIO2SliceNum(4)), PWM_divmode(free_run))
-pwm_mask |= 1 << GPIO2SliceNum(4)
+cc = 0#1249 
+IOreg_write(PWM_DIV(GPIO2SliceNum(hsa)), 1<<4)
+IOreg_write(PWM_TOP(GPIO2SliceNum(hsa)), wrapVal)
+IOreg_write(PWM_CC(GPIO2SliceNum(hsa)), cc) 
+IOreg_write(PWM_CSR(GPIO2SliceNum(hsa)), PWM_divmode(free_run))
+pwm_mask |= 1 << GPIO2SliceNum(hsa)
+
+# pwm hsb
+wrapVal = 6249
+cc = 0 #1249 
+IOreg_write(PWM_DIV(GPIO2SliceNum(hsb)), 1<<4)
+IOreg_write(PWM_TOP(GPIO2SliceNum(hsb)), wrapVal) 
+IOreg_write(PWM_CC(GPIO2SliceNum(hsb)), cc) 
+IOreg_write(PWM_CSR(GPIO2SliceNum(hsb)), PWM_divmode(free_run))
+pwm_mask |= 1 << GPIO2SliceNum(hsb)
+
+# pwm hsc
+wrapVal = 6249
+cc = 0#1249 
+IOreg_write(PWM_DIV(GPIO2SliceNum(hsc)), 1<<4)
+IOreg_write(PWM_TOP(GPIO2SliceNum(hsc)), wrapVal)
+IOreg_write(PWM_CC(GPIO2SliceNum(hsc)), cc) 
+IOreg_write(PWM_CSR(GPIO2SliceNum(hsc)), PWM_divmode(free_run))
+pwm_mask |= 1 << GPIO2SliceNum(hsc)
 
 
 IOreg_write(PWM_EN, pwm_mask) # enable PWM simultaneously
@@ -209,11 +251,6 @@ def DMA_TREQ(trigger_source):
 
 def DMA_CHAIN_TO (next_ch):
     return (next_ch & 0x0f)<<11
-
-DMA_RING_SEL = (1<<10)
-
-def DMA_RING_SIZE(ring_size):
-    return  (ring_size & 0x0f)<<6
 
 DMA_WR_INC = (1<<5) 
 DMA_RD_INC = (1<<4) 
@@ -327,7 +364,6 @@ machine.mem32[DMA_CTRL(adc_dma_chan3)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan2)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan1)] |= DMA_EN
 machine.mem32[DMA_CTRL(sig_dma_chan)] |= DMA_EN
-
 
 try:
     while True:
