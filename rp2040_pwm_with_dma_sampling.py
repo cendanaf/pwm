@@ -365,10 +365,14 @@ machine.mem32[DMA_CTRL(adc_dma_chan2)] |= DMA_EN
 machine.mem32[DMA_CTRL(adc_dma_chan1)] |= DMA_EN
 machine.mem32[DMA_CTRL(sig_dma_chan)] |= DMA_EN
 
+
 try:
     while True:
-        print(get_data())
-        time.sleep(0.5)
+        SOA = get_data()[0]
+        if SOA > 3500:
+            IOreg_write(PWM_CC(GPIO2SliceNum(hsc)), 0)
+        if SOA < 2000:
+            IOreg_write(PWM_CC(GPIO2SliceNum(hsc)), 1249)
 except KeyboardInterrupt:
     print("Exiting")
     machine.mem32[DMA_Ch_ABORT] = 0xffff
