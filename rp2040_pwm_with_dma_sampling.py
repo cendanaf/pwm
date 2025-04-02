@@ -287,11 +287,11 @@ IOreg_write(ADC_CS_ADDR, (ADC_RROBIN(0x7) |
                         ADC_EN))
 
 
-adc_fifo_drain(1)
+adc_fifo_drain(0)
 
-IOreg_write(ADC_FIFO_CS_ADDR, ADC_THRESH(1) |
+IOreg_write(ADC_FIFO_CS_ADDR, (ADC_THRESH(1) |
                         ADC_DREQ_EN |
-                        ADC_FIFO_EN )
+                        ADC_FIFO_EN) )
 
 
 
@@ -353,6 +353,48 @@ DREQ_UNPACED = 0x3f
 # DMA setup
 
 
+
+adc_buf_dma_chan = 2
+adc_buf = array.array('i', [0]*10)
+ctrl = (DMA_IRQ_QUIET |
+        DMA_WR_INC |
+        DMA_CHAIN_TO(1) |
+        DMA_TREQ(DREQ_ADC) |
+        DMA_DATA_WIDTH(data_32))
+
+IOreg_write(DMA_RD_ADDR(adc_buf_dma_chan), ADC_FIFO_ADDR)
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_TR_COUNT_ADDR(adc_buf_dma_chan), 1)
+IOreg_write(DMA_CTRL_ADDR(adc_buf_dma_chan),  ctrl)
+machine.mem32[DMA_CTRL_ADDR(adc_buf_dma_chan)] |= DMA_EN
+
+
+
+
+
+
+run_adc_dma_chan = 1
+run_adc = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(2)|(1<<2)|ADC_EN])
+ctrl = (DMA_IRQ_QUIET |
+        DMA_TREQ(DREQ_PWM_WRAP7) |
+        DMA_CHAIN_TO(adc_buf_dma_chan) |
+        DMA_DATA_WIDTH(data_32) )
+
+IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(run_adc))
+IOreg_write(DMA_WR_ADDR(run_adc_dma_chan), ADC_CS_ADDR)
+IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), 1)
+IOreg_write(DMA_CTRL_ADDR(run_adc_dma_chan),  ctrl)
+machine.mem32[DMA_CTRL_ADDR(run_adc_dma_chan)] |= DMA_EN
+
+
+
+
+
+
+
+
+
+
 sli = GPIO2SliceNum(hsa)
 lvl = GPIO2SliceLev(hsa)
 
@@ -360,30 +402,64 @@ lvl = GPIO2SliceLev(hsa)
 pulse = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
 pulse_dma_chan = 0
 
-def PulsePin(pin):
-    sli = GPIO2SliceNum(pin)
-    if sli == 0:
-        dreq = DREQ_PWM_WRAP0
-    elif sli == 1:
-        dreq = DREQ_PWM_WRAP1
-    elif sli == 2:
-        dreq = DREQ_PWM_WRAP2
-    
-    ctrl = (DMA_IRQ_QUIET |
-            DMA_TREQ(dreq) |
-            DMA_RD_INC |
-            DMA_DATA_WIDTH(data_32))
-            
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(sli))
-    IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 2)
-    IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
-    machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
+ctrl = (DMA_IRQ_QUIET |
+        DMA_TREQ(DREQ_PWM_WRAP0) |
+        DMA_RD_INC |
+        DMA_DATA_WIDTH(data_32) )
+
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(sli))
+IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 2)
+IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
+machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
     
 
 
+
+
+
+mask = 0
+mask |= 1 << pulse_dma_chan
+mask |= 1 << run_adc_dma_chan
+mask |= 1 << adc_buf_dma_chan
+
+
+
+adc_fifo_drain(0)
 IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
-PulsePin(hsa)
-PulsePin(hsb)
+
+
+
+# 1
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_multi_chan_enable, mask)
+#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
+print(adc_buf)
+adc_fifo_drain(0)
+
+
+
+
+# 2
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
+print(adc_buf)
+adc_fifo_drain(0)
+
+
+# 3
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
+print(adc_buf)
+adc_fifo_drain(0)
+
+
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
+machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
+adc_fifo_drain(1)
+
 
