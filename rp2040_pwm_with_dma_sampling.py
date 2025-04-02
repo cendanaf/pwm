@@ -13,9 +13,6 @@ lsb = 19
 lsa = 17
 pwm_ref = 14
 
-LSA = machine.Pin(lsa, machine.Pin.OUT)
-LSA.high()
-
 
 # ====================================
 # === Register write functions =======
@@ -36,6 +33,16 @@ def IOreg_xor(reg_addr, data):
 IO_base   = 0x40014000
 PADS_BASE = 0x4001c000
 
+# === GPIO ===========================
+GPIO_BASE    = 0xd0000000
+GPIO_IN      = 0x004 + GPIO_BASE
+GPIO_OUT     = 0x010 + GPIO_BASE
+GPIO_OUT_SET = 0x014 + GPIO_BASE
+GPIO_OUT_CLR = 0x018 + GPIO_BASE
+GPIO_OE      = 0x020 + GPIO_BASE
+GPIO_OE_SET  = 0x024 + GPIO_BASE
+GPIO_OE_CLR  = 0x028 + GPIO_BASE
+
 def GPIO_CTRL(chan_num):
     return chan_num*8 + 4 + IO_base
 
@@ -47,6 +54,42 @@ def GPIO_PAD_CTRL(pad_num):
 
 def GPIO2SliceNum(chan_num):
     return (chan_num >> 1) & 7
+
+
+
+# gpio_init(lsa)
+IOreg_write(GPIO_IN, 1<<lsa)      # gpio_set_dir(lsa, GPIO.IN)
+IOreg_write(GPIO_OUT_CLR, 1<<lsa) # gpio_put(lsa, 0)
+IOreg_write(GPIO_CTRL(lsa), 5)    # gpio_set_function(lsa, 5)
+
+# gpio_init(lsb)
+IOreg_write(GPIO_IN, 1<<lsb)      
+IOreg_write(GPIO_OUT_CLR, 1<<lsb) 
+IOreg_write(GPIO_CTRL(lsb), 5)
+
+
+# gpio_init(lsc)
+IOreg_write(GPIO_IN, 1<<lsc)     
+IOreg_write(GPIO_OUT_CLR, 1<<lsc) 
+IOreg_write(GPIO_CTRL(lsc), 5)    
+
+
+IOreg_write(GPIO_OE, 1<<lsa)      # gpio_set_dir(lsa, GPIO.OUT)
+
+# Needed to activate lsb without zeroing lsa
+oe_mask = machine.mem32[GPIO_OE] 
+
+oe_mask |= 1<<lsb
+IOreg_write(GPIO_OE, oe_mask)
+
+oe_mask |= 1<<lsc
+IOreg_write(GPIO_OE, oe_mask)
+
+
+
+IOreg_write(GPIO_OUT_SET, 1<<lsa) # gpio_put(lsa, 1)
+
+
     
 # === PWM ============================
 PWM_base =  0x40050000
