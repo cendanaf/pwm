@@ -180,12 +180,12 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_5us
+shift = ((2**16)-1) - cc_0p5us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
 # pwm sampling channel
-cc = 750
+cc = cc_1us
 sli = GPIO2SliceNum(pwm_sam)
 lvl = GPIO2SliceLev(pwm_sam)
 IOreg_write(PWM_DIV_ADDR(sli), PWM_DIV(1,0))
@@ -357,19 +357,33 @@ sli = GPIO2SliceNum(hsa)
 lvl = GPIO2SliceLev(hsa)
 
 
-lsa_bit = array.array('i', [1<<lsa])
-#pwm = array.array('i', [0, 0])
-pwm = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
+pulse = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
+pulse_dma_chan = 0
 
-tst_dma_chan = 0
+def PulsePin(pin):
+    sli = GPIO2SliceNum(pin)
+    if sli == 0:
+        dreq = DREQ_PWM_WRAP0
+    elif sli == 1:
+        dreq = DREQ_PWM_WRAP1
+    elif sli == 2:
+        dreq = DREQ_PWM_WRAP2
+    
+    ctrl = (DMA_IRQ_QUIET |
+            DMA_TREQ(dreq) |
+            DMA_RD_INC |
+            DMA_DATA_WIDTH(data_32))
+            
+    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(sli))
+    IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 2)
+    IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
+    machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
+    
 
 
-IOreg_write(DMA_RD_ADDR(tst_dma_chan), addressof(pwm))
-IOreg_write(DMA_WR_ADDR(tst_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-IOreg_write(DMA_TR_COUNT_ADDR(tst_dma_chan), 2)
-IOreg_write(DMA_CTRL_ADDR(tst_dma_chan), DMA_IRQ_QUIET |
-                            DMA_TREQ(DREQ_PWM_WRAP0) |
-                            DMA_RD_INC |
-                            DMA_DATA_WIDTH(data_32) )
+IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
+PulsePin(hsa)
+PulsePin(hsb)
+IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
 
-machine.mem32[DMA_CTRL_ADDR(tst_dma_chan)] |= DMA_EN
