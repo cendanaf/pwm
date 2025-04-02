@@ -5,12 +5,12 @@ import math
 from uctypes import addressof
 
 # Pins
-hsc = 21 #20
-hsb = 19 #18
-hsa = 17 #16
-lsc = 20 #21
-lsb = 18 #19
-lsa = 16 #17
+hsc = 21 
+hsb = 19 
+hsa = 17 
+lsc = 20 
+lsb = 18 
+lsa = 16 
 pwm_ref = 14 # reference pwm
 pwm_sam = 15 # sampling pwm
 
@@ -68,7 +68,6 @@ IOreg_write(GPIO_IN_ADDR, 1<<lsb)
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsb) 
 IOreg_write(GPIO_CTRL_ADDR(lsb), 5)
 
-
 # gpio_init(lsc)
 IOreg_write(GPIO_IN_ADDR, 1<<lsc)     
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc) 
@@ -88,7 +87,7 @@ IOreg_write(GPIO_OE_ADDR, oe_mask)
 
 
 
-IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa) # gpio_put(lsa, 1)
+#IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa) # gpio_put(lsa, 1)
 
 
     
@@ -216,7 +215,7 @@ IOreg_write(PWM_CSR_ADDR(sli), PWM_divmode(free_run))
 pwm_mask |= 1 << sli
 
 # pwm hsc
-cc = cc_10us
+cc = 0
 sli = GPIO2SliceNum(hsc)
 lvl = GPIO2SliceLev(hsc)
 IOreg_write(PWM_DIV_ADDR(sli), PWM_DIV(1,0))
@@ -283,11 +282,9 @@ IOreg_write(GPIO_PAD_CTRL_ADDR(26), 0b10000000)
 
 IOreg_write(ADC_DIV_ADDR, ADC_Div_int(96) | ADC_Div_frac(0))
 
-print(bin(machine.mem32[ADC_CS_ADDR]))
 IOreg_write(ADC_CS_ADDR, (ADC_RROBIN(0x7) |
                         ADC_AINSEL(0) |
                         ADC_EN))
-print(bin(machine.mem32[ADC_CS_ADDR]))
 
 
 adc_fifo_drain(1)
@@ -302,8 +299,9 @@ IOreg_write(ADC_FIFO_CS_ADDR, ADC_THRESH(1) |
 # register adddresses for DMA
 # datasheet page 102
 DMA_base              = 0x50000000
-DMA_multi_chan_enable = DMA_base + 0x430
+DMA_multi_chan_enable = 0x430 + DMA_base
 DMA_TIMER0            = 0x420 + DMA_base
+DMA_Ch_ABORT_ADDR     = 0x444 + DMA_base
 # ===================================
 # === DMA channel control registers
 # valid channels: 0 to 11
@@ -320,7 +318,7 @@ def DMA_CTRL_ADDR(ch_num):
     return (0x40*ch_num + 0x0c + DMA_base)
 
 
-DMA_Ch_ABORT = 0x444 + DMA_base
+
 DMA_BUSY = (1<<24) 
 DMA_IRQ_QUIET = (1<<21) 
 
@@ -345,126 +343,33 @@ DMA_EN = 1
 
 DREQ_ADC = 36
 DREQ_PWM_WRAP0 = 24
-
+DREQ_PWM_WRAP1 = 25
+DREQ_PWM_WRAP2 = 26
+DREQ_PWM_WRAP7 = 31
+DREQ_UNPACED = 0x3f
 
 
 # ====================================
 # DMA setup
-stp_adc_dma_chan = 3
-adc_dma_chan = 2
-adc_dma_chan3 = 6
-adc_dma_chan2 = 5
-adc_dma_chan1 = 4
-sig_dma_chan = 1
-rst_adc_dma_chan = 0
-tmr_dma_chan = 7
-
-dma_mask = 0
-for i in range(7):
-    dma_mask |= 1 << i
-    
-# Buffers
-pause_adc = array.array('i', [ADC_RROBIN(0x7)|ADC_AINSEL(0)|(0<<3)|ADC_EN])
-run_adc   = array.array('i', [ADC_RROBIN(0x7)|ADC_AINSEL(0)|(1<<3)|ADC_EN])
-pause_sig_dma = array.array('i', [DMA_IRQ_QUIET |
-                            DMA_TREQ(DREQ_PWM_WRAP0) | 
-                            DMA_DATA_WIDTH(data_32) |
-                            DMA_CHAIN_TO(adc_dma_chan1)])
-a = machine.mem32[PWM_EN_ADDR]
-a &= ~1
-pause_pwm = array.array('i', [a])
-
-adc_buff1 = array.array('H', [0])
-adc_buff2 = array.array('H', [0])
-adc_buff3 = array.array('H', [0])
-
-def get_data():
-    return [adc_buff1[0], adc_buff2[0], adc_buff3[0]]
 
 
-# Pauses the ADC (after obtaining the 3 samples)
-IOreg_write(DMA_RD_ADDR(stp_adc_dma_chan), addressof(pause_adc))
-IOreg_write(DMA_WR_ADDR(stp_adc_dma_chan), ADC_CS_ADDR)
-IOreg_write(DMA_TR_COUNT_ADDR(stp_adc_dma_chan), 1)
-IOreg_write(DMA_CTRL_ADDR(stp_adc_dma_chan), DMA_IRQ_QUIET |
-                            DMA_DATA_WIDTH(data_32)  |
-                            DMA_CHAIN_TO(sig_dma_chan) )
+sli = GPIO2SliceNum(hsa)
+lvl = GPIO2SliceLev(hsa)
 
 
-# adc 3 DMA channel 
-# Gathers ADC samples and moves it into the buffer
-IOreg_write(DMA_RD_ADDR(adc_dma_chan3), ADC_FIFO_ADDR)
-IOreg_write(DMA_WR_ADDR(adc_dma_chan3), addressof(adc_buff3))
-IOreg_write(DMA_TR_COUNT_ADDR(adc_dma_chan3), 1)
-IOreg_write(DMA_CTRL_ADDR(adc_dma_chan3), DMA_IRQ_QUIET |
-                        DMA_TREQ(DREQ_ADC) |
-                        DMA_DATA_WIDTH(data_16) |
-                        DMA_CHAIN_TO(stp_adc_dma_chan) )
+lsa_bit = array.array('i', [1<<lsa])
+#pwm = array.array('i', [0, 0])
+pwm = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
+
+tst_dma_chan = 0
 
 
-# adc2 DMA channel 
-# Gathers ADC samples and moves it into the buffer
-IOreg_write(DMA_RD_ADDR(adc_dma_chan2), ADC_FIFO_ADDR)
-IOreg_write(DMA_WR_ADDR(adc_dma_chan2), addressof(adc_buff2))
-IOreg_write(DMA_TR_COUNT_ADDR(adc_dma_chan2), 1)
-IOreg_write(DMA_CTRL_ADDR(adc_dma_chan2), DMA_IRQ_QUIET |
-                        DMA_TREQ(DREQ_ADC) |
-                        DMA_DATA_WIDTH(data_16) |
-                        DMA_CHAIN_TO(adc_dma_chan3) )
+IOreg_write(DMA_RD_ADDR(tst_dma_chan), addressof(pwm))
+IOreg_write(DMA_WR_ADDR(tst_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
+IOreg_write(DMA_TR_COUNT_ADDR(tst_dma_chan), 2)
+IOreg_write(DMA_CTRL_ADDR(tst_dma_chan), DMA_IRQ_QUIET |
+                            DMA_TREQ(DREQ_PWM_WRAP0) |
+                            DMA_RD_INC |
+                            DMA_DATA_WIDTH(data_32) )
 
-
-# adc1 DMA channel 
-# Gathers ADC samples and moves it into the buffer
-IOreg_write(DMA_RD_ADDR(adc_dma_chan1), ADC_FIFO_ADDR)
-IOreg_write(DMA_WR_ADDR(adc_dma_chan1), addressof(adc_buff1))
-IOreg_write(DMA_TR_COUNT_ADDR(adc_dma_chan1), 1)
-IOreg_write(DMA_CTRL_ADDR(adc_dma_chan1), DMA_IRQ_QUIET |
-                        DMA_TREQ(DREQ_ADC) |
-                        DMA_DATA_WIDTH(data_16) |
-                        DMA_CHAIN_TO(adc_dma_chan2) )
-
-
-
-# Waits for the start of a PWM pulse to run ADC sampling
-IOreg_write(DMA_RD_ADDR(sig_dma_chan), addressof(run_adc))
-IOreg_write(DMA_WR_ADDR(sig_dma_chan), ADC_CS_ADDR)
-IOreg_write(DMA_TR_COUNT_ADDR(sig_dma_chan), 1)
-IOreg_write(DMA_CTRL_ADDR(sig_dma_chan), DMA_IRQ_QUIET |
-                            DMA_TREQ(DREQ_PWM_WRAP0) | 
-                            DMA_DATA_WIDTH(data_32) |
-                            DMA_CHAIN_TO(adc_dma_chan1) )
-
-
-
-#machine.mem32[DMA_multi_chan_enable] |= dma_mask # doesn't work
-machine.mem32[DMA_CTRL_ADDR(stp_adc_dma_chan)] |= DMA_EN
-machine.mem32[DMA_CTRL_ADDR(adc_dma_chan3)] |= DMA_EN
-machine.mem32[DMA_CTRL_ADDR(adc_dma_chan2)] |= DMA_EN
-machine.mem32[DMA_CTRL_ADDR(adc_dma_chan1)] |= DMA_EN
-machine.mem32[DMA_CTRL_ADDR(sig_dma_chan)] |= DMA_EN
-
-
-try:
-    while True:
-        SOA = get_data()[0]
-        """
-        if SOA > 3500:
-            IOreg_write(PWM_CC_ADDR(GPIO2SliceNum(hsc)), 0)
-        if SOA < 2000:
-            IOreg_write(PWM_CC_ADDR(GPIO2SliceNum(hsc)), 1249)
-        """
-except KeyboardInterrupt:
-    print("Exiting")
-    machine.mem32[DMA_Ch_ABORT] = 0xffff
-    
-    IOreg_write(PWM_EN_ADDR, 0)
-    
-    IOreg_write(ADC_FIFO_CS_ADDR, ADC_THRESH(1) |
-                        ADC_DREQ_EN |
-                        0 )
-    IOreg_write(ADC_CS_ADDR, (ADC_RROBIN(0x7) |
-                        ADC_AINSEL(0) |
-                        0))
-    adc_fifo_drain(True)
-   
-
+machine.mem32[DMA_CTRL_ADDR(tst_dma_chan)] |= DMA_EN
