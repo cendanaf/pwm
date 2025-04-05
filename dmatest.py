@@ -351,25 +351,6 @@ DREQ_UNPACED = 0x3f
 
 # ====================================
 # DMA setup
-
-dma_chan3 = 3
-testsrc3 = array.array('i', [3])
-testsrc3_ptr = array.array('i', [addressof(testsrc3)])
-testdst3 = array.array('i', [0, 0, 0])
-ctrl = (DMA_IRQ_QUIET |
-        DMA_DATA_WIDTH(data_32))
-
-IOreg_write(DMA_RD_ADDR(dma_chan3), addressof(testsrc3_ptr))
-#IOreg_write(DMA_WR_ADDR(dma_chan3), addressof(testdst3))
-IOreg_write(DMA_WR_ADDR(dma_chan3), DMA_RD_ADDR(1))
-IOreg_write(DMA_TR_COUNT_ADDR(dma_chan3), 1)
-IOreg_write(DMA_CTRL_ADDR(dma_chan3),  ctrl)
-machine.mem32[DMA_CTRL_ADDR(dma_chan3)] |= DMA_EN
-
-
-
-
-
 dma_chan2 = 2
 testsrc2 = array.array('i', [2])
 testsrc2_ptr = array.array('i', [addressof(testsrc2)])
@@ -379,7 +360,6 @@ ctrl = (DMA_IRQ_QUIET |
         DMA_DATA_WIDTH(data_32))
 
 IOreg_write(DMA_RD_ADDR(dma_chan2), addressof(testsrc2_ptr))
-#IOreg_write(DMA_WR_ADDR(dma_chan2), addressof(testdst2))
 IOreg_write(DMA_WR_ADDR(dma_chan2), DMA_RD_ADDR(1))
 IOreg_write(DMA_TR_COUNT_ADDR(dma_chan2), 1)
 IOreg_write(DMA_CTRL_ADDR(dma_chan2),  ctrl)
@@ -390,11 +370,11 @@ machine.mem32[DMA_CTRL_ADDR(dma_chan2)] |= DMA_EN
 
 dma_chan1 = 1
 testsrc1 = array.array('i', [1])
-testdst1 = array.array('i', [0, 0, 0])
+testdst1 = array.array('i', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_PWM_WRAP7) |
         DMA_WR_INC |
-        DMA_CHAIN_TO(dma_chan2) |
+        #DMA_CHAIN_TO(dma_chan2) |
         DMA_DATA_WIDTH(data_32) )
         
 
@@ -407,70 +387,51 @@ machine.mem32[DMA_CTRL_ADDR(dma_chan1)] |= DMA_EN
 
 
 
+print("testdst2: ", testdst2)
+print("testdst1: ", testdst1)
 
 
-
-
-"""
-
-sli = GPIO2SliceNum(hsa)
-lvl = GPIO2SliceLev(hsa)
-
-
-pulse = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
-pulse_dma_chan = 0
-
-def PulsePin(pin):
-    sli = GPIO2SliceNum(pin)
-    if sli == 0:
-        dreq = DREQ_PWM_WRAP0
-    elif sli == 1:
-        dreq = DREQ_PWM_WRAP1
-    elif sli == 2:
-        dreq = DREQ_PWM_WRAP2
-    
-    ctrl = (DMA_IRQ_QUIET |
-            DMA_TREQ(dreq) |
-            DMA_RD_INC |
-            DMA_DATA_WIDTH(data_32) )#|
-            #DMA_CHAIN_TO(dma_chan1))
-            
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(sli))
-    IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 2)
-    IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
-    machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
-
-"""
 
 
 
 dma_chan_mask = 0
-#for i in [pulse_dma_chan, dma_chan1, dma_chan2, dma_chan3]:
-#    dma_chan_mask |= 1 << i
 
-
-dma_chan_mask |= 1 << dma_chan1
+#dma_chan_mask |= 1 << dma_chan1
 dma_chan_mask |= 1 << dma_chan2
-#dma_chan_mask |= 1 << dma_chan3
    
 
-print(bin(machine.mem32[DMA_multi_chan_enable]))
-machine.mem32[DMA_multi_chan_enable] |= dma_chan_mask#1 << dma_chan2
-print(bin(machine.mem32[DMA_multi_chan_enable]))
+print(bin(dma_chan_mask))
+machine.mem32[DMA_multi_chan_enable] |= dma_chan_mask
+
  
 
 
 
 
 IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
-#PulsePin(hsa)
-print("testdst3: ", testdst3)
+
 print("testdst2: ", testdst2)
 print("testdst1: ", testdst1)
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
 
 
-machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
+
+
+
+
+dma_chan_mask = 0
+
+#dma_chan_mask |= 1 << dma_chan1
+dma_chan_mask |= 1 << dma_chan2
+print(bin(dma_chan_mask))
+machine.mem32[DMA_multi_chan_enable] |= dma_chan_mask
+print("testdst2: ", testdst2)
+print("testdst1: ", testdst1)
+
+
+
+
+
+
 
 
