@@ -399,7 +399,7 @@ sli = GPIO2SliceNum(hsa)
 lvl = GPIO2SliceLev(hsa)
 
 
-pulse = array.array('i', [PWM_CC(cc_1us, sli, lvl), 0])
+pulse = array.array('i', [PWM_CC(cc_5us, sli, lvl), 0])
 pulse_dma_chan = 0
 
 ctrl = (DMA_IRQ_QUIET |
@@ -417,6 +417,63 @@ machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
 
 
 
+def PulseAndSample(hsx):
+    sli = GPIO2SliceNum(hsx)
+
+    if sli == 0:
+        dreq = DREQ_PWM_WRAP0
+    elif sli == 1:
+        dreq = DREQ_PWM_WRAP1
+    elif sli == 2:
+        dreq = DREQ_PWM_WRAP2
+        
+    ctrl = (DMA_IRQ_QUIET |
+            DMA_TREQ(dreq) |
+            DMA_RD_INC |
+            DMA_DATA_WIDTH(data_32)|
+            DMA_EN)
+    
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(sli))
+    IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
+    run_adc = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(sli)|(1<<2)|ADC_EN])
+    
+    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    
+    print(adc_buf)
+    
+    return max(adc_buf)
+    
+    
+    
+        
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 mask = 0
 mask |= 1 << pulse_dma_chan
@@ -430,66 +487,13 @@ IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
 
 
 
-# 1
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("1", adc_buf)
-adc_fifo_drain(1)
+a = PulseAndSample(hsa)
+print(a)
 
 
+a = PulseAndSample(hsb)
+print(a)
 
-
-# 2
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("2", adc_buf)
-adc_fifo_drain(1)
-
-
-# 3
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("3", adc_buf)
-adc_fifo_drain(1)
-
-
-#4
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("4", adc_buf)
-adc_fifo_drain(0)
-
-
-
-#5
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("5", adc_buf)
-adc_fifo_drain(1)
-
-
-
-
-#6
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("6", adc_buf)
-adc_fifo_drain(1)
-
-
-
-#7
-IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
-IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
-IOreg_write(DMA_multi_chan_enable, mask)
-print("7", adc_buf)
-adc_fifo_drain(1)
 
 
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
