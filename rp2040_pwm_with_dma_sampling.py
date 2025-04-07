@@ -355,7 +355,7 @@ DREQ_UNPACED = 0x3f
 
 
 adc_buf_dma_chan = 2
-adc_buf = array.array('i', [0]*10)
+adc_buf = array.array('i', [0]*4)
 ctrl = (DMA_IRQ_QUIET |
         DMA_WR_INC |
         DMA_CHAIN_TO(1) |
@@ -432,10 +432,10 @@ IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
 
 # 1
 IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
 IOreg_write(DMA_multi_chan_enable, mask)
-#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
-print(adc_buf)
-adc_fifo_drain(0)
+print("1", adc_buf)
+adc_fifo_drain(1)
 
 
 
@@ -444,18 +444,52 @@ adc_fifo_drain(0)
 IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
 IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
 IOreg_write(DMA_multi_chan_enable, mask)
-#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
-print(adc_buf)
-adc_fifo_drain(0)
+print("2", adc_buf)
+adc_fifo_drain(1)
 
 
 # 3
 IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
 IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
 IOreg_write(DMA_multi_chan_enable, mask)
-#print((machine.mem32[ADC_FIFO_ADDR] & 0xfff))
-print(adc_buf)
+print("3", adc_buf)
+adc_fifo_drain(1)
+
+
+#4
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+print("4", adc_buf)
 adc_fifo_drain(0)
+
+
+
+#5
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+print("5", adc_buf)
+adc_fifo_drain(1)
+
+
+
+
+#6
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+print("6", adc_buf)
+adc_fifo_drain(1)
+
+
+
+#7
+IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse))
+IOreg_write(DMA_multi_chan_enable, mask)
+print("7", adc_buf)
+adc_fifo_drain(1)
 
 
 IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
