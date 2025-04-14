@@ -149,7 +149,10 @@ wrap = 6249
 
 # A few cc values for 20 kHz
 cc_10us  = 1249
+cc_6us   = 750
 cc_5us   = 625
+cc_4us   = 500
+cc_3us   = 375
 cc_2us   = 250
 cc_1us   = 125
 cc_2p5us = 187
@@ -183,7 +186,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_0p5us
+shift = ((2**16)-1) - cc_5us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -432,7 +435,7 @@ IOreg_write(DMA_CTRL_ADDR(sig_adc_dma_chan),  ctrl)
 machine.mem32[DMA_CTRL_ADDR(sig_adc_dma_chan)] |= DMA_EN
 
 
-pulse = array.array('i', [PWM_CC(cc_1us, 0, 1)])
+pulse = array.array('i', [PWM_CC(cc_2us, 0, 1)])
 pulse_dma_chan = 0
 
 ctrl = (DMA_IRQ_QUIET |
@@ -477,102 +480,104 @@ sm.active(1)
 
 
 
+
+
+
+# ====================================
+# Position detection function
+def PD():
+    # Beginning of the buffer
+    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf))
+    
+    # Set lsc high
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
+    # Update the ADC sampling channel (to lsc)
+    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsc))
+    # Setup a pulse from hsa
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsa pulse
+    sm.put(lsc)
+    a = sm.get()
+    # Setup a pulse from hsb
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsb pulse
+    sm.put(lsc)
+    a = sm.get()
+    # Set lsc low
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
+    
+    # Set lsa high
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa)
+    # Update the ADC sampling channel (to lsa)
+    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsa))
+    # Setup a pulse from hsb
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsb pulse
+    sm.put(lsa)
+    a = sm.get()
+    # Setup a pulse from hsc
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsc pulse
+    sm.put(lsa)
+    a = sm.get()
+    # Set lsa low
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsa)
+    
+    # Set lsb high
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsb)
+    # Update the ADC sampling channel (to lsb)
+    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsb))
+    # Setup a pulse from hsa
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsa pulse
+    sm.put(lsb)
+    a = sm.get()
+    # Setup a pulse from hsc
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
+    IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsc pulse
+    sm.put(lsb)
+    a = sm.get()
+    # Set lsb low
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsb)
+    
+    #print("[hsa-lsc, hsb-lsc, hsb-lsa, hsc-lsa, hsa-lsb, hsc-lsb]")
+    return adc_buf
+    
+
+
+
+
+
+
+
+
+
+
+
 adc_fifo_drain(0)
 
+try:
+    while True:
+        a = PD()
+        i = list(adc_buf).index(max(adc_buf))
+        print(i)
+        time.sleep(0.25)
+except KeyboardInterrupt:
+    print("Exiting...")
+    sm.active(0)
+    machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
+    adc_fifo_drain(1)
 
-#result = [0, 0, 0, 0, 0, 0]
-
-
-
-# lsc high
-IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
-IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsc))
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsc)
-a = sm.get()
-#print(a, "hsa-lsc", adc_buf)
-#result[0] = adc_buf[0]
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsc)
-a = sm.get()
-#print(a, "hsb-lsc", adc_buf)
-#result[1] = adc_buf[0]
-
-IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
-
-
-
-
-
-# lsa high
-IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa)
-IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsa))
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsa)
-a = sm.get()
-#print(a, "hsb-lsa", adc_buf)
-#result[2] = adc_buf[0]
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsa)
-a = sm.get()
-#print(a, "hsc-lsa", adc_buf)
-#result[3] = adc_buf[0]
-
-IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsa)
-
-
-
-
-
-
-
-
-# lsb high
-IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsb)
-IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsb))
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsb)
-a = sm.get()
-#print(a, "hsa-lsb", adc_buf)
-#result[4] = adc_buf[0]
-
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-IOreg_write(DMA_WR_ADDR(stp_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-IOreg_write(DMA_multi_chan_enable, mask)
-sm.put(lsb)
-a = sm.get()
-#print(a, "hsc-lsb", adc_buf)
-#result[5] = adc_buf[0]
-
-IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsb)
-
-
-
-
-
-
-print(adc_buf)
-
-
-
-
-
-sm.active(0)
-machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
-adc_fifo_drain(1)
 
