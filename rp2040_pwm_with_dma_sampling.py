@@ -149,6 +149,9 @@ wrap = 6249
 
 # A few cc values for 20 kHz
 cc_10us  = 1249
+cc_9us   = 1125
+cc_8us   = 1000
+cc_7us   = 875
 cc_6us   = 750
 cc_5us   = 625
 cc_4us   = 500
@@ -184,9 +187,8 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 
-
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_1us
+shift = ((2**16)-1) - cc_10us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -523,6 +525,7 @@ try:
         time.sleep(0.25)
 except KeyboardInterrupt:
     print("Exiting...")
+    print(a)
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
     sm.active(0)
     machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
