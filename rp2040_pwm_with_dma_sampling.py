@@ -144,10 +144,21 @@ PWM_FN = 4
 pwm_mask = 0
 free_run = 0
 
-# 20 kHz at full clock speed (125 MHz)
-wrap = 6249 
 
-# A few cc values for 20 kHz
+# Counter values for a 16 bit counter clocked at 125 MHz
+cc_50us  = 6250
+cc_40us  = 5000
+cc_30us  = 3750
+cc_20us  = 2500
+cc_19us  = 2375
+cc_18us  = 2250
+cc_17us  = 2125
+cc_16us  = 2000
+cc_15us  = 1875
+cc_14us  = 1750
+cc_13us  = 1625
+cc_12us  = 1500
+cc_11us  = 1375
 cc_10us  = 1250
 cc_9us   = 1125
 cc_8us   = 1000
@@ -160,6 +171,8 @@ cc_2us   = 250
 cc_1us   = 125
 cc_2p5us = 187
 cc_0p5us = 62
+
+wrap = cc_40us - 1
 
 
 # ====================================
@@ -421,7 +434,46 @@ machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
 
 
-pulse_array = array.array('i', [PWM_CC((2 * cc_10us), 0, 1),
+pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
+                                PWM_CC((1 * cc_10us), 0, 1),
                                 0])
 pulse_dma_chan = 2
 
@@ -504,11 +556,18 @@ sm.active(1)
 
 # ====================================
 # Position detection function
-def PD(hsx):
+def PD(hsx, lsx):
+    if lsx == lsa:
+        sample_lsx = sample_lsa
+    elif lsx == lsb:
+        sample_lsx = sample_lsb
+    else:
+        sample_lsx = sample_lsc
+        
     IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
     
     IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsc))
+    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsx))
     
     IOreg_write(DMA_WR_ADDR(sig_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
     IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
@@ -536,16 +595,16 @@ IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
 
 try:
     while True:
-        a = PD(hsa)
-        print(a)
+        a = PD(hsa, lsc)
+        #print(a)
         time.sleep(0.25)
 except KeyboardInterrupt:
-    #s = []
+    s = []
     print("Exiting...")
-    #for i in range(3):
-        #a = PD(hsa)
-        #s.append(a[0])
-    #print(s)
+    for i in range(3):
+        a = PD(hsa, lsc)
+        s.append(a[0])
+    print(s)
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
     sm.active(0)
     machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
