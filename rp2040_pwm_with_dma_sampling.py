@@ -172,7 +172,7 @@ cc_1us   = 125
 cc_2p5us = 187
 cc_0p5us = 62
 
-wrap = cc_40us - 1
+wrap = cc_50us - 1
 
 
 # ====================================
@@ -434,46 +434,9 @@ machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
 
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
-                                PWM_CC((1 * cc_10us), 0, 1),
+pulse_array = array.array('i', [#PWM_CC((1 * cc_10us), 0, 1),
+                                #PWM_CC((1 * cc_10us), 0, 1),
+                                #PWM_CC((1 * cc_10us), 0, 1),
                                 0])
 pulse_dma_chan = 2
 
@@ -592,13 +555,17 @@ def PD(hsx, lsx):
 adc_fifo_drain(0)
 
 IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
+IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsb)
+
+IOreg_write(PWM_CC_ADDR(GPIO2SliceNum(hsa)), PWM_CC((1 * cc_9us), 0, 1))
 
 try:
     while True:
-        a = PD(hsa, lsc)
+        #a = PD(hsa, lsc)
         #print(a)
         time.sleep(0.25)
 except KeyboardInterrupt:
+    IOreg_write(PWM_CC_ADDR(GPIO2SliceNum(hsa)), PWM_CC((0), 0, 1))
     s = []
     print("Exiting...")
     for i in range(3):
@@ -606,6 +573,7 @@ except KeyboardInterrupt:
         s.append(a[0])
     print(s)
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsb)
     sm.active(0)
     machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
     adc_fifo_drain(1)
