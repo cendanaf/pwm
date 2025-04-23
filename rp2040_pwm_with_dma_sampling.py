@@ -201,7 +201,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_10us
+shift = ((2**16)-1) - cc_8us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -249,7 +249,7 @@ pwm_mask |= 1 << sli
 IOreg_write(PWM_EN_ADDR, pwm_mask) # enable PWM simultaneously
 
 # ====================================
-# PIO
+# PIO (P. 367)
 PIO0_BASE_ADDR = 0x50200000
 PIO0_TXF0_ADDR = 0x010 + PIO0_BASE_ADDR
 PIO0_TXF1_ADDR = 0x014 + PIO0_BASE_ADDR
@@ -388,7 +388,6 @@ DREQ_UNPACED = 0x3f
 buf_updated_dma_chan = 6
 buf_updated_array = array.array('i', [42069])
 ctrl = (DMA_IRQ_QUIET |
-        #DMA_TREQ(DREQ_ADC) |
         #DMA_WR_INC |
         DMA_DATA_WIDTH(data_32))
 
@@ -461,7 +460,7 @@ machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
 
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
+pulse_array = array.array('i', [PWM_CC((1 * cc_8us), 0, 1),
                                 0])
 pulse_dma_chan = 2
 
@@ -571,6 +570,8 @@ def Sample(lsx):
 # ====================================
 # Pulse sampling function
 def SamplePulse(hsx, lsx):
+    old_adc_val = adc_buf_array[0]
+    
     # Prepare the sampling DMA
     Sample(lsx)
     # Prepare the pulse DMA
@@ -582,16 +583,29 @@ def SamplePulse(hsx, lsx):
     # Activate hsx pulse
     sm0.put(42069)
     a = sm0.get()
-    # Wait for ADC buffer to update
+    # Wait for adc buffer to update
     b = sm1.get()
     # Set lsx low
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsx)
     return adc_buf_array
     
+# ====================================
+# Position array function
+def GetPosArr():
+    a = [0, 0, 0, 0, 0, 0]
+    a[0] = SamplePulse(hsb, lsc)[0]
+    a[1] = SamplePulse(hsc, lsb)[0]
+    a[2] = SamplePulse(hsa, lsb)[0]
+    a[3] = SamplePulse(hsb, lsa)[0]
+    a[4] = SamplePulse(hsc, lsa)[0]
+    a[5] = SamplePulse(hsa, lsc)[0]
+    return a
 
-
-    
-
+# ====================================
+# Position detection function
+def PosDet():
+    a = GetPosArr()
+    return a.index(max(a))
 
 
 
@@ -603,11 +617,13 @@ def SamplePulse(hsx, lsx):
 
 
 adc_fifo_drain(0)
-
 try:
     while True:
-        a = SamplePulse(hsa, lsc)
-        print(a)
+        #print(SamplePulse(hsa, lsc)[0])
+        position_array = GetPosArr()
+        position = position_array.index(max(position_array))
+        print(position, position_array)
+        #print(PosDet())
         time.sleep(0.25)
 except KeyboardInterrupt:
     s = []
