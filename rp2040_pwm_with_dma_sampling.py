@@ -201,7 +201,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_8us
+shift = ((2**16)-1) - cc_10us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -460,7 +460,7 @@ machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
 
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_8us), 0, 1),
+pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
                                 0])
 pulse_dma_chan = 2
 
@@ -619,10 +619,11 @@ def PosDet():
 adc_fifo_drain(0)
 try:
     while True:
-        #print(SamplePulse(hsa, lsc)[0])
-        position_array = GetPosArr()
-        position = position_array.index(max(position_array))
-        print(position, position_array)
+        a = SamplePulse(hsa, lsc)
+        #print(a)
+        #position_array = GetPosArr()
+        #position = position_array.index(max(position_array))
+        #print(position, position_array)
         #print(PosDet())
         time.sleep(0.25)
 except KeyboardInterrupt:
