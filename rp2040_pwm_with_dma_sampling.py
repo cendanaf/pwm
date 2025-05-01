@@ -376,7 +376,6 @@ pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*5)
 discharge_array = array.array('i', [0,
                                     0,
                                     0,
-                                    0,
                                     0])
 nPulses = len(pulse_array)
 nDischarges = len(discharge_array)
@@ -416,7 +415,6 @@ sample_lsb = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(1)|(1<<2)|ADC_EN])
 sample_lsc = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(2)|(1<<2)|ADC_EN])
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_PWM_WRAP7) |
-        #DMA_CHAIN_TO(adc_buf_dma_chan) |
         DMA_DATA_WIDTH(data_32) )
 
 IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsa))
@@ -556,7 +554,7 @@ mask |= 1 << adc_buf_dma_chan
 
 # ====================================
 # PIO setup
-@rp2.asm_pio()#(autopull=True, autopush=True)
+@rp2.asm_pio()
 def PIORXSignal():
     label("wait4data")
     pull()
@@ -640,6 +638,7 @@ try:
     while True:
         a = RunPulse(hsa, lsc)
         print(a)
+        print("")
         time.sleep(0.25)
 except KeyboardInterrupt:
     #s = []
