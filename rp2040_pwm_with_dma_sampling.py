@@ -144,21 +144,10 @@ PWM_FN = 4
 pwm_mask = 0
 free_run = 0
 
+# 20 kHz at full clock speed (125 MHz)
+wrap = 6249 
 
-# Counter values for a 16 bit counter clocked at 125 MHz
-cc_50us  = 6250
-cc_40us  = 5000
-cc_30us  = 3750
-cc_20us  = 2500
-cc_19us  = 2375
-cc_18us  = 2250
-cc_17us  = 2125
-cc_16us  = 2000
-cc_15us  = 1875
-cc_14us  = 1750
-cc_13us  = 1625
-cc_12us  = 1500
-cc_11us  = 1375
+# A few cc values for 20 kHz
 cc_10us  = 1250
 cc_9us   = 1125
 cc_8us   = 1000
@@ -171,8 +160,6 @@ cc_2us   = 250
 cc_1us   = 125
 cc_2p5us = 187
 cc_0p5us = 62
-
-wrap = cc_50us - 1
 
 
 # ====================================
@@ -201,7 +188,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_10us
+shift = ((2**16)-1) - cc_5us
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -253,7 +240,8 @@ IOreg_write(PWM_EN_ADDR, pwm_mask) # enable PWM simultaneously
 PIO0_BASE_ADDR = 0x50200000
 PIO0_TXF0_ADDR = 0x010 + PIO0_BASE_ADDR
 PIO0_TXF1_ADDR = 0x014 + PIO0_BASE_ADDR
-
+PIO0_RXF0_ADDR = 0x020 + PIO0_BASE_ADDR
+PIO0_RXF1_ADDR = 0x024 + PIO0_BASE_ADDR
 
 
 # === ADC ============================
@@ -372,8 +360,6 @@ DMA_EN = 1
 
 DREQ_PIO0_TX0 = 0
 DREQ_PIO0_RX0 = 4
-DREQ_PIO0_TX1 = 1
-DREQ_PIO0_RX1 = 5
 DREQ_ADC = 36
 DREQ_PWM_WRAP0 = 24
 DREQ_PWM_WRAP1 = 25
@@ -385,33 +371,32 @@ DREQ_UNPACED = 0x3f
 
 # ====================================
 # DMA setup
-buf_updated_dma_chan = 6
-buf_updated_array = array.array('i', [42069])
-ctrl = (DMA_IRQ_QUIET |
-        #DMA_WR_INC |
-        DMA_DATA_WIDTH(data_32))
 
-IOreg_write(DMA_RD_ADDR(buf_updated_dma_chan), addressof(buf_updated_array))
-IOreg_write(DMA_WR_ADDR(buf_updated_dma_chan), PIO0_TXF1_ADDR)
-IOreg_write(DMA_TR_COUNT_ADDR(buf_updated_dma_chan), 1)
-IOreg_write(DMA_CTRL_ADDR(buf_updated_dma_chan),  ctrl)
-machine.mem32[DMA_CTRL_ADDR(buf_updated_dma_chan)] |= DMA_EN
-
+pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*5)
+discharge_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
+                                    0,
+                                    0,
+                                    0,
+                                    0])
+nPulses = len(pulse_array)
+nDischarges = len(discharge_array)
+adc_buf_array = array.array('i', [0]*(nPulses + nDischarges))
 
 
 
 
-adc_buf_dma_chan = 5
-adc_buf_array = array.array('i', [0])
+
+
+
+adc_buf_dma_chan = 7
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_ADC) |
-        #DMA_WR_INC |
-        DMA_CHAIN_TO(buf_updated_dma_chan) |
+        DMA_WR_INC |
         DMA_DATA_WIDTH(data_32))
 
 IOreg_write(DMA_RD_ADDR(adc_buf_dma_chan), ADC_FIFO_ADDR)
 IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
-IOreg_write(DMA_TR_COUNT_ADDR(adc_buf_dma_chan), 1)
+IOreg_write(DMA_TR_COUNT_ADDR(adc_buf_dma_chan), len(adc_buf_array))
 IOreg_write(DMA_CTRL_ADDR(adc_buf_dma_chan),  ctrl)
 machine.mem32[DMA_CTRL_ADDR(adc_buf_dma_chan)] |= DMA_EN
 
@@ -420,7 +405,7 @@ machine.mem32[DMA_CTRL_ADDR(adc_buf_dma_chan)] |= DMA_EN
 
 
 
-run_adc_dma_chan = 4
+run_adc_dma_chan = 6
 sample_lsa = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(0)|(1<<2)|ADC_EN])
 sample_lsb = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(1)|(1<<2)|ADC_EN])
 sample_lsc = array.array('i', [ADC_RROBIN(0)|ADC_AINSEL(2)|(1<<2)|ADC_EN])
@@ -431,14 +416,14 @@ ctrl = (DMA_IRQ_QUIET |
 
 IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsa))
 IOreg_write(DMA_WR_ADDR(run_adc_dma_chan), ADC_CS_ADDR)
-IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), 1)
+IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), len(adc_buf_array))
 IOreg_write(DMA_CTRL_ADDR(run_adc_dma_chan),  ctrl)
 machine.mem32[DMA_CTRL_ADDR(run_adc_dma_chan)] |= DMA_EN
 
 
 
-sync_array = array.array('i', [0])
-sync_adc_dma_chan = 3
+sync_array = array.array('i', [0, 0])
+sync_adc_dma_chan = 5
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_PWM_WRAP0) |
         DMA_CHAIN_TO(run_adc_dma_chan) |
@@ -446,7 +431,7 @@ ctrl = (DMA_IRQ_QUIET |
 
 IOreg_write(DMA_RD_ADDR(sync_adc_dma_chan), addressof(sync_array))
 IOreg_write(DMA_WR_ADDR(sync_adc_dma_chan), addressof(sync_array))
-IOreg_write(DMA_TR_COUNT_ADDR(sync_adc_dma_chan), 2)
+IOreg_write(DMA_TR_COUNT_ADDR(sync_adc_dma_chan), len(sync_array))
 IOreg_write(DMA_CTRL_ADDR(sync_adc_dma_chan),  ctrl)
 machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
@@ -459,19 +444,44 @@ machine.mem32[DMA_CTRL_ADDR(sync_adc_dma_chan)] |= DMA_EN
 
 
 
+discharge_dma_chan = 4
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
-                                0])
+ctrl = (DMA_IRQ_QUIET |
+        DMA_TREQ(DREQ_PWM_WRAP0) |
+        DMA_RD_INC |
+        DMA_CHAIN_TO(discharge_dma_chan) |
+        DMA_DATA_WIDTH(data_32) )
+
+IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
+IOreg_write(DMA_TR_COUNT_ADDR(discharge_dma_chan), nDischarges)
+IOreg_write(DMA_CTRL_ADDR(discharge_dma_chan), ctrl)
+machine.mem32[DMA_CTRL_ADDR(discharge_dma_chan)] |= DMA_EN
+
+
+next_phase_array = array.array('i', [3])
+next_phase_dma_chan = 3
+
+ctrl = (DMA_IRQ_QUIET |
+        DMA_TREQ(DREQ_UNPACED) |
+        DMA_CHAIN_TO(discharge_dma_chan) |
+        DMA_DATA_WIDTH(data_32) )
+
+IOreg_write(DMA_RD_ADDR(next_phase_dma_chan), addressof(next_phase_array))
+IOreg_write(DMA_WR_ADDR(next_phase_dma_chan), PIO0_TXF1_ADDR)
+IOreg_write(DMA_TR_COUNT_ADDR(next_phase_dma_chan), 1)
+IOreg_write(DMA_CTRL_ADDR(next_phase_dma_chan), ctrl)
+machine.mem32[DMA_CTRL_ADDR(next_phase_dma_chan)] |= DMA_EN
+
 pulse_dma_chan = 2
 
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_PWM_WRAP0) |
         DMA_RD_INC |
+        DMA_CHAIN_TO(next_phase_dma_chan) |
         DMA_DATA_WIDTH(data_32) )
 
 IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(2))
-IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), len(pulse_array))
+IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), nPulses)
 IOreg_write(DMA_CTRL_ADDR(pulse_dma_chan), ctrl)
 machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
 
@@ -481,13 +491,14 @@ machine.mem32[DMA_CTRL_ADDR(pulse_dma_chan)] |= DMA_EN
 
 
 sig_adc_dma_chan = 1
+sig_adc_array = array.array('i', [0])
 ctrl = (DMA_IRQ_QUIET |
         DMA_TREQ(DREQ_PIO0_RX0) |
         DMA_CHAIN_TO(sync_adc_dma_chan) |
         DMA_DATA_WIDTH(data_32) )
 
-IOreg_write(DMA_RD_ADDR(sig_adc_dma_chan), addressof(pulse_array))
-IOreg_write(DMA_WR_ADDR(sig_adc_dma_chan), addressof(pulse_array))
+IOreg_write(DMA_RD_ADDR(sig_adc_dma_chan), addressof(sig_adc_array))
+IOreg_write(DMA_WR_ADDR(sig_adc_dma_chan), addressof(sig_adc_array))
 IOreg_write(DMA_TR_COUNT_ADDR(sig_adc_dma_chan), 1)
 IOreg_write(DMA_CTRL_ADDR(sig_adc_dma_chan),  ctrl)
 machine.mem32[DMA_CTRL_ADDR(sig_adc_dma_chan)] |= DMA_EN
@@ -502,7 +513,7 @@ ctrl = (DMA_IRQ_QUIET |
         DMA_DATA_WIDTH(data_32) )
 
 IOreg_write(DMA_RD_ADDR(sig_pulse_dma_chan), addressof(sig_array))
-IOreg_write(DMA_WR_ADDR(sig_pulse_dma_chan), PWM_CC_ADDR(2))
+IOreg_write(DMA_WR_ADDR(sig_pulse_dma_chan), addressof(sig_array))
 IOreg_write(DMA_TR_COUNT_ADDR(sig_pulse_dma_chan), 1)
 IOreg_write(DMA_CTRL_ADDR(sig_pulse_dma_chan), ctrl)
 machine.mem32[DMA_CTRL_ADDR(sig_pulse_dma_chan)] |= DMA_EN
@@ -522,94 +533,53 @@ mask |= 1 << sig_adc_dma_chan
 
 
 # ====================================
-# PIO initialization
+# PIO setup
 @rp2.asm_pio()
-def PIOSignal():
-    wrap_target()
-    pull(block)
+def PIORXSignal():
+    label("wait4data")
+    pull()
+    jmp(not_osre, "signal")
+    jmp("wait4data")
+    label("signal")
     mov(isr, osr)
-    push(block)
-    wrap()
+    push()
+    jmp("wait4data")
 
 
 rp2.PIO(0).remove_program()
-sm0 = rp2.StateMachine(0, PIOSignal)
-sm0.active(1)
-sm1 = rp2.StateMachine(1, PIOSignal)
-sm1.active(1)
+activate_sm = rp2.StateMachine(0, prog=PIORXSignal)
+activate_sm.active(1)
+next_phase_sm = rp2.StateMachine(1, PIORXSignal)
+next_phase_sm.active(1)
 
 
 
 
-# ====================================
-# Pulse function
-def Pulse(hsx):
-    # Reset the read address (if there is a read increment)
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    # Update the pulse pin
-    IOreg_write(DMA_WR_ADDR(sig_pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
-    return
 
-# ====================================
-# Sample function
-def Sample(lsx):
-    if lsx == lsa:
-        sample_lsx = sample_lsa
-    elif lsx == lsb:
-        sample_lsx = sample_lsb
-    else:
-        sample_lsx = sample_lsc
-        
-    # Reset the write address (if there is a write increment)
-    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
-    # Update the ADC channel pin
-    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsx))
-    return
-    
-# ====================================
-# Pulse sampling function
-def SamplePulse(hsx, lsx):
-    old_adc_val = adc_buf_array[0]
-    
-    # Prepare the sampling DMA
-    Sample(lsx)
-    # Prepare the pulse DMA
-    Pulse(hsx)
-    # Enable the two signal DMA channels
-    IOreg_write(DMA_multi_chan_enable, mask)
-    # Set lsx high
-    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsx)
-    # Activate hsx pulse
-    sm0.put(42069)
-    a = sm0.get()
-    # Wait for adc buffer to update
-    b = sm1.get()
-    # Set lsx low
-    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsx)
-    return adc_buf_array
-    
-# ====================================
-# Position array function
-def GetPosArr():
-    a = [0, 0, 0, 0, 0, 0]
-    a[0] = SamplePulse(hsb, lsc)[0]
-    a[1] = SamplePulse(hsc, lsb)[0]
-    a[2] = SamplePulse(hsa, lsb)[0]
-    a[3] = SamplePulse(hsb, lsa)[0]
-    a[4] = SamplePulse(hsc, lsa)[0]
-    a[5] = SamplePulse(hsa, lsc)[0]
-    return a
+
 
 # ====================================
 # Position detection function
-def PosDet():
-    a = GetPosArr()
-    return a.index(max(a))
-
-
-
-
+def PD(hsx):
+    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
+    
+    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
+    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
+    IOreg_write(DMA_RD_ADDR(run_adc_dma_chan), addressof(sample_lsc))
+    
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
+    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Activate hsx pulse
+    activate_sm.put(42069)
+    a = activate_sm.get()
+    b = next_phase_sm.get()
+    print(b)
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa)
+    
+    
+    return adc_buf_array
+    
 
 
 
@@ -617,25 +587,26 @@ def PosDet():
 
 
 adc_fifo_drain(0)
+
+IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
+
 try:
     while True:
-        a = SamplePulse(hsa, lsc)
-        #print(a)
-        #position_array = GetPosArr()
-        #position = position_array.index(max(position_array))
-        #print(position, position_array)
-        #print(PosDet())
+        a = PD(hsa)
+        print(a)
+        IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsa)
         time.sleep(0.25)
 except KeyboardInterrupt:
-    s = []
+    #s = []
     print("Exiting...")
-    for i in range(3):
-        a = SamplePulse(hsa, lsc)
-        s.append(a[0])
-    print(s)
-    sm0.active(0)
-    sm1.active(0)
+    #for i in range(3):
+        #a = PD(hsa)
+        #s.append(a[0])
+    #print(s)
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
+    activate_sm.active(0)
+    next_phase_sm.active(0)
+    rp2.PIO(0).remove_program()
     machine.mem32[DMA_Ch_ABORT_ADDR] = 0xffff
     adc_fifo_drain(1)
-
 
