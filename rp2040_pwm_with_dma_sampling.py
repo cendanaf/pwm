@@ -372,8 +372,8 @@ DREQ_UNPACED = 0x3f
 # ====================================
 # DMA setup
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*5)
-discharge_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1),
+pulse_array = array.array('i', [PWM_CC((1 * cc_5us), 0, 1)]*5)
+discharge_array = array.array('i', [PWM_CC((1 * cc_5us), 0, 1),
                                     0,
                                     0,
                                     0,
@@ -549,7 +549,7 @@ def PIORXSignal():
 rp2.PIO(0).remove_program()
 activate_sm = rp2.StateMachine(0, prog=PIORXSignal)
 activate_sm.active(1)
-next_phase_sm = rp2.StateMachine(1, PIORXSignal)
+next_phase_sm = rp2.StateMachine(1, prog=PIORXSignal)
 next_phase_sm.active(1)
 
 
@@ -575,7 +575,6 @@ def PD(hsx):
     a = activate_sm.get()
     b = next_phase_sm.get()
     print(b)
-    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa)
     
     
     return adc_buf_array
@@ -594,7 +593,6 @@ try:
     while True:
         a = PD(hsa)
         print(a)
-        IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsa)
         time.sleep(0.25)
 except KeyboardInterrupt:
     #s = []
