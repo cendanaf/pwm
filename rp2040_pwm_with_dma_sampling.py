@@ -158,7 +158,6 @@ cc_4us   = 500
 cc_3us   = 375
 cc_2us   = 250
 cc_1us   = 125
-cc_2p5us = 187
 cc_0p5us = 62
 
 
@@ -188,7 +187,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - cc_5us
+shift = ((2**16)-1) - ((5*cc_1us))
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -374,7 +373,7 @@ DREQ_UNPACED = 0x3f
 # ====================================
 # DMA setup
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*30)
+pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*150)
 discharge_array = array.array('i', [0,
                                     0,
                                     0,
@@ -383,13 +382,6 @@ discharge_array = array.array('i', [0,
 nPulses = len(pulse_array)
 nDischarges = len(discharge_array)
 adc_buf_array = array.array('i', [0]*(nPulses + nDischarges))
-
-
-single_pulse_array = array.array('i', [PWM_CC(cc_10us, 0, 1)])
-single_discharge_array = array.array('i', [0])
-single_adc_buf_array = array.array('i', [0])
-
-
 
 
 
@@ -591,9 +583,10 @@ def NextPhase(next):
 
 
 
+
 # ====================================
-# Pulse function
-def Pulse(hsx):
+# Pulses function
+def Pulses(hsx):
     # Reset the read address
     IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
     IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
@@ -619,13 +612,13 @@ def Sample(lsx):
     return
     
 # ====================================
-# Pulse sampling function
-def RunPulse(hsx, lsx):
+# Pulse sampling functions
+def RunPulses(hsx, lsx):
     # Prepare the sampling DMA
     Sample(lsx)
     # Prepare the pulse DMA
-    Pulse(hsx)
-    # Enable the two signal DMA channels
+    Pulses(hsx)
+    # Enable the required DMA channels
     IOreg_write(DMA_multi_chan_enable, mask)
     # Set lsx high
     IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsx)
@@ -641,6 +634,39 @@ def RunPulse(hsx, lsx):
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsx)
     return current_phase, adc_buf_array
 
+# ====================================
+# Single Pulse function
+def Pulse(hsx, lsx):
+    Sample(lsx)
+    # Reset the read address
+    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
+    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
+    # Update the pulse pin
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
+    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsx)))
+    # Single pulse means changing the appropriate transfer counts
+    IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 1)
+    IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), 1)
+    
+    # Enable the required DMA channels
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Set lsx high
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsx)
+    # Activate hsx pulse
+    activate_sm.put(42069)
+    a = activate_sm.get()
+    # Wait for discharge state
+    current_phase = discharge_sig_sm.get()
+    c = pulse_finished_sm.get()
+    # Set lsx low
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsx)
+    
+    # Restoring the transfer counts
+    IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), nPulses)
+    IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), len(adc_buf_array))
+    
+    return adc_buf_array[0]
+
 
 
     
@@ -652,25 +678,29 @@ def RunPulse(hsx, lsx):
 
 adc_fifo_drain(0)
 
-phases = [ (hsa, lsc),
-           (hsb, lsc),
-           (hsc, lsb),
-           (hsa, lsb),
+phases = [ (hsc, lsa),
            (hsb, lsa),
-           (hsc, lsa) ]
+           (hsb, lsc),
+           (hsa, lsc),
+           (hsa, lsb),
+           (hsc, lsb) ]
+
+#def MotorPhase0():
+#def MotorPhase1():
+#def MotorPhase2():
+#def MotorPhase3():
+#def MotorPhase4():
+#def MotorPhase5():
 
 # Initial Position detection goes here
-phase = 0
+phase = 5
 discharge_sig_array[0] = phase
 hsx, lsx = phases[phase]
 
 try:
     while True:
-        current_phase, samples = RunPulse(hsx, lsx)
-        print(current_phase)
-        print("")
-        phase = discharge_sig_array[0]
-        hsx, lsx = phases[phase]
+        a = Pulse(hsx, lsx)
+        print(a)
         time.sleep(1)
 except KeyboardInterrupt:
     print("Exiting...")
