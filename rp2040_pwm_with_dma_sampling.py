@@ -672,27 +672,59 @@ def Pulse(hsx, lsx):
 # ====================================
 # Position detection function
 def PosDet():
-    r = [0, 0, 0, 0, 0, 0]
+    r = [0, 0, 0]
     
     # Single pulse means changing the appropriate transfer counts
     IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), 1)
     IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), 1)
     
-    # Starting with lsa, run pulse on hsc and hsb
+    # Starting with lsc, run pulse on hsb
+    # Reset the adc buffer write address and prepare the sampling DMA
+    Sample(lsc)
+    
+    # Reset the pulse read address
+    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
+    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
+    # Running pulse on hsb
+    # Update the pulse pin
+    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
+    
+    # Enable the required DMA channels
+    IOreg_write(DMA_multi_chan_enable, mask)
+    # Set lsc high
+    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
+    # Activate hsb pulse
+    activate_sm.put(42069)
+    a = activate_sm.get()
+    # Wait for discharge state
+    current_phase = discharge_sig_sm.get()
+    # Update position 0
+    r[2] = adc_buf_array[0]
+    # Wait until discharge state is finished
+    c = pulse_finished_sm.get()
+    
+    # Set lsc low
+    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
+    
+    
+    
+    
+    # Then to lsa, run pulse on hsc and hsb
     # Reset the adc buffer write address and prepare the sampling DMA
     Sample(lsa)
     
     # Reset the pulse read address
     IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
     IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
-    # Running pulse on hsc
+    # Running pulse on hsa
     # Update the pulse pin
     IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
     IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
     
     # Enable the required DMA channels
     IOreg_write(DMA_multi_chan_enable, mask)
-    # Set lsa high
+    # Set lsc high
     IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsa)
     # Activate hsc pulse
     activate_sm.put(42069)
@@ -728,112 +760,6 @@ def PosDet():
     # Set lsa low
     IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsa)
     
-    
-    
-    
-    # Continue on with lsc, run pulse on hsa and hsb
-    # Reset the adc buffer write address and prepare the sampling DMA
-    Sample(lsc)
-    
-    # Reset the pulse read address
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
-    # Running pulse on hsa
-    # Update the pulse pin
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-    
-    # Enable the required DMA channels
-    IOreg_write(DMA_multi_chan_enable, mask)
-    # Set lsc high
-    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsc)
-    # Activate hsa pulse
-    activate_sm.put(42069)
-    a = activate_sm.get()
-    # Wait for discharge state
-    current_phase = discharge_sig_sm.get()
-    # Update position 3
-    r[3] = adc_buf_array[0]
-    # Wait until discharge state is finished
-    c = pulse_finished_sm.get()
-    
-    # Reset the adc buffer write address
-    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
-    # Reset the pulse read address
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
-    # Running pulse on hsb
-    # Update the pulse pin
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsb)))
-    # Enable the required DMA channels
-    IOreg_write(DMA_multi_chan_enable, mask)
-    # Activate hsb pulse
-    activate_sm.put(42069)
-    a = activate_sm.get()
-    # Wait for discharge state
-    current_phase = discharge_sig_sm.get()
-    # Update position 1
-    r[2] = adc_buf_array[0]
-    # Wait until discharge state is finished
-    c = pulse_finished_sm.get()
-    
-    # Set lsc low
-    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsc)
-    
-    
-    
-    
-    # Finally with lsb, run pulse on hsa and hsc
-    # Reset the adc buffer write address and prepare the sampling DMA
-    Sample(lsb)
-    
-    # Reset the pulse read address
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
-    # Running pulse on hsa
-    # Update the pulse pin
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsa)))
-    
-    # Enable the required DMA channels
-    IOreg_write(DMA_multi_chan_enable, mask)
-    # Set lsb high
-    IOreg_write(GPIO_OUT_SET_ADDR, 1<<lsb)
-    # Activate hsc pulse
-    activate_sm.put(42069)
-    a = activate_sm.get()
-    # Wait for discharge state
-    current_phase = discharge_sig_sm.get()
-    # Update position 4
-    r[4] = adc_buf_array[0]
-    # Wait until discharge state is finished
-    c = pulse_finished_sm.get()
-    
-    # Reset the adc buffer write address
-    IOreg_write(DMA_WR_ADDR(adc_buf_dma_chan), addressof(adc_buf_array))
-    # Reset the pulse read address
-    IOreg_write(DMA_RD_ADDR(pulse_dma_chan), addressof(pulse_array))
-    IOreg_write(DMA_RD_ADDR(discharge_dma_chan), addressof(discharge_array))
-    # Running pulse on hsc
-    # Update the pulse pin
-    IOreg_write(DMA_WR_ADDR(pulse_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-    IOreg_write(DMA_WR_ADDR(discharge_dma_chan), PWM_CC_ADDR(GPIO2SliceNum(hsc)))
-    # Enable the required DMA channels
-    IOreg_write(DMA_multi_chan_enable, mask)
-    # Activate hsc pulse
-    activate_sm.put(42069)
-    a = activate_sm.get()
-    # Wait for discharge state
-    current_phase = discharge_sig_sm.get()
-    # Update position 5
-    r[5] = adc_buf_array[0]
-    # Wait until discharge state is finished
-    c = pulse_finished_sm.get()
-    
-    # Set lsb low
-    IOreg_write(GPIO_OUT_CLR_ADDR, 1<<lsb)
-    
     # Restoring the transfer counts
     IOreg_write(DMA_TR_COUNT_ADDR(pulse_dma_chan), nPulses)
     IOreg_write(DMA_TR_COUNT_ADDR(run_adc_dma_chan), len(adc_buf_array))
@@ -867,14 +793,16 @@ phase = 5
 discharge_sig_array[0] = phase
 hsx, lsx = phases[phase]
 
+p = [[0,3], [1, 4], [2, 5]]
+
 try:
     while True:
-        t0 = time.ticks_us()
         a = PosDet()
-        t = time.ticks_us() - t0
         pos = a.index(max(a))
         nxt = a.index(min(a))
-        print(t, pos, nxt, a)
+        
+        print(p[pos], p[nxt], a)
+        
         time.sleep(0.1)
 except KeyboardInterrupt:
     print("Exiting...")
