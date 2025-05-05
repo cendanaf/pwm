@@ -187,7 +187,7 @@ IOreg_write(GPIO_CTRL_ADDR(hsc), PWM_FN ) # pwm function slice 2B
 
 
 # Shift pwm_sam
-shift = ((2**16)-1) - ((5*cc_1us))
+shift = ((2**16)-1) - ((2*cc_1us) + cc_0p5us)
 IOreg_write(PWM_CTR_ADDR(GPIO2SliceNum(pwm_sam)), shift)
 
 
@@ -373,7 +373,7 @@ DREQ_UNPACED = 0x3f
 # ====================================
 # DMA setup
 
-pulse_array = array.array('i', [PWM_CC((1 * cc_10us), 0, 1)]*150)
+pulse_array = array.array('i', [PWM_CC((1 * cc_5us), 0, 1)]*150)
 discharge_array = array.array('i', [0,
                                     0,
                                     0,
@@ -797,11 +797,14 @@ p = [[0,3], [1, 4], [2, 5]]
 
 try:
     while True:
+        t0 = time.ticks_us()
         a = PosDet()
+        t = time.ticks_us() - t0
         pos = a.index(max(a))
         nxt = a.index(min(a))
         
-        print(p[pos], p[nxt], a)
+        
+        print(t, p[pos], p[nxt], a)
         
         time.sleep(0.1)
 except KeyboardInterrupt:
